@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>糖尿病防治：生活方式指南</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-light: #dbeafe;
+      --success: #059669;
+      --success-light: #d1fae5;
+      --warning: #d97706;
+      --warning-light: #fef3c7;
+      --danger: #dc2626;
+      --danger-light: #fee2e2;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-sub: #475569;
+      --border: #e2e8f0;
+      --radius: 16px;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      line-height: 1.65;
+      padding: 20px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .infographic {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      padding: 30px 10px 20px;
+    }
+    h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; color: var(--primary); margin-bottom: 6px; letter-spacing: -0.5px; }
+    .subtitle { font-size: 1.1rem; color: var(--text-sub); margin-bottom: 24px; }
+    
+    .core-box {
+      background: linear-gradient(135deg, var(--primary-light), var(--success-light));
+      border: 2px solid var(--primary);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 32px;
+      text-align: left;
+      box-shadow: var(--shadow);
+    }
+    .core-box h2 { font-size: 1.25rem; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .core-box p { margin-bottom: 8px; }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 12px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
+    
+    .card h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card h3.risk { border-color: var(--warning); color: var(--warning); }
+    .card h3.carbs { border-color: var(--success); color: var(--success); }
+    .card h3.exercise { border-color: var(--primary); color: var(--primary); }
+    .card h3.diet { border-color: #8b5cf6; color: #8b5cf6; }
+    .card h3.sleep { border-color: var(--danger); color: var(--danger); }
+    .card h3.monitor { border-color: #0ea5e9; color: #0ea5e9; }
+    .card h3.daily { border-color: var(--text-main); color: var(--text-main); }
+    
+    ul { list-style: none; padding-left: 0; }
+    ul li { padding: 8px 0; border-bottom: 1px dashed var(--border); display: flex; align-items: flex-start; gap: 10px; font-size: 0.98rem; }
+    ul li:last-child { border-bottom: none; }
+    .highlight { background: var(--warning-light); padding: 2px 6px; border-radius: 4px; font-weight: 600; color: #92400e; }
+    
+    .step-list { list-style: none; counter-reset: step; margin-top: 8px; }
+    .step-list li { counter-increment: step; }
+    .step-list li::before { content: counter(step); background: var(--primary); color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; flex-shrink: 0; margin-top: 2px; }
+    
+    .replace-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.95rem; border-radius: 8px; overflow: hidden; }
+    .replace-table th, .replace-table td { padding: 10px 12px; border: 1px solid var(--border); text-align: left; }
+    .replace-table th { background: var(--primary-light); font-weight: 600; color: var(--primary); }
+    .replace-table tr:nth-child(even) { background: #f8fafc; }
+    
+    .alert-box { background: var(--danger-light); border-left: 4px solid var(--danger); padding: 12px; border-radius: 0 8px 8px 0; margin: 12px 0; font-size: 0.95rem; color: #991b1b; }
+    .tip-box { background: var(--success-light); border-left: 4px solid var(--success); padding: 12px; border-radius: 0 8px 8px 0; margin: 12px 0; font-size: 0.95rem; color: #065f46; }
+    
+    table.tracking { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 16px; font-size: 0.9rem; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    table.tracking th { background: var(--primary); color: white; padding: 12px; font-weight: 600; text-align: center; }
+    table.tracking td { border-bottom: 1px solid var(--border); padding: 12px 8px; background: white; text-align: center; }
+    table.tracking td:first-child { background: #f8fafc; font-weight: 600; text-align: left; padding-left: 12px; }
+    table.tracking input { border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 6px; width: 90%; text-align: center; font-size: 0.9rem; }
+    table.tracking input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+    
+    .reminders {
+      background: linear-gradient(135deg, #1e293b, #334155);
+      color: white;
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      margin-top: 24px;
+      box-shadow: 0 8px 20px -5px rgb(0 0 0 / 0.25);
+    }
+    .reminders h2 { font-size: 1.6rem; margin-bottom: 18px; text-align: center; letter-spacing: 1px; }
+    .reminders ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 24px; }
+    .reminders ul li { border-bottom-color: rgba(255,255,255,0.2); color: #e2e8f0; padding: 10px 0; }
+    .reminders ul li:last-child { border-bottom: none; }
+    .reminders ul li strong { color: #fbbf24; font-weight: 700; }
+    
+    footer { text-align: center; padding: 24px 10px; color: var(--text-sub); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 24px; }
+    
+    /* 响应式适配 */
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; gap: 18px; }
+      .card { padding: 18px; }
+      .reminders ul { grid-template-columns: 1fr; }
+      body { padding: 12px; }
+    }
+    
+    /* 打印优化 */
+    @media print {
+      body { background: white; padding: 0; color: #000; }
+      .infographic { max-width: 100%; }
+      .card, .core-box, .reminders, table.tracking { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; background: white; color: black; }
+      .reminders { background: #f8f9fa; }
+      .reminders ul li { border-bottom-color: #ddd; color: #000; }
+      .reminders ul li strong { color: #000; border-bottom: 2px solid #000; }
+      .alert-box, .tip-box, .highlight { background: #f0f0f0; border-left-color: #666; color: #000; }
+      table.tracking th { background: #e5e7eb; color: #000; }
+      table.tracking input { border: 1px solid #999; }
+      header, .grid, .reminders, footer { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <main class="infographic">
+    <header>
+      <h1>🩺 糖尿病防治：生活方式指南</h1>
+      <p class="subtitle">科学控糖 · 循序渐进 · 长期受益</p>
+    </header>
+
+    <div class="core-box">
+      <h2>💡 核心认知</h2>
+      <p><strong>糖尿病不是一天吃出来的，也不是靠一天少吃就能好。</strong>它更像“身体处理糖的能力变差了”。</p>
+      <p>⚠️ <strong>关键原则</strong>：生活方式是基础，但医生已开药<span class="highlight">不可自行停药</span>。正确做法：先把饮食、运动、睡眠、体重管理做好，药物遵医嘱，定期复查后由医生判断是否减药。</p>
+    </div>
+
+    <div class="grid">
+      <!-- 高危人群 -->
+      <section class="card">
+        <h3 class="risk">🎯 高危人群筛查</h3>
+        <p style="margin-bottom:10px; font-size:0.95rem; color:var(--text-sub);">符合以下任一条件，请主动进行年度筛查：</p>
+        <ul>
+          <li>👴 年龄＞35岁</li>
+          <li>📏 腹型肥胖：男腰围＞90cm，女＞85cm，或BMI偏高</li>
+          <li>👨‍👩‍👧‍👦 直系亲属有糖尿病史</li>
+          <li>🪑 久坐少动、体力活动少</li>
+          <li>📉 曾查出“糖尿病前期”</li>
+          <li>🫀 合并高血压/高血脂/脂肪肝/心脑血管病</li>
+          <li>🤰 女性有妊娠糖尿病史或生过巨大儿</li>
+          <li>🔬 多囊卵巢综合征、黑棘皮病</li>
+          <li>💊 长期用激素或某些精神类药物</li>
+          <li>📈 腰围持续增大（即使体重不重）</li>
+        </ul>
+      </section>
+
+      <!-- 碳水管理 -->
+      <section class="card">
+        <h3 class="carbs">🌾 碳水管理 & 进食顺序</h3>
+        <p>不要怕碳水，怕的是<span class="highlight">“糖负荷高”与“波动大”</span>。长期大幅波动会损害血管、眼睛、肾脏、神经。</p>
+        <p style="margin-top:10px; font-size:0.95rem;"><strong>🍚 替换一半精致碳水：</strong></p>
+        <table class="replace-table">
+          <tr><th>原主食</th><th>✅ 替换建议</th></tr>
+          <tr><td>白米饭</td><td>糙米/燕麦/藜麦/荞麦/豆类</td></tr>
+          <tr><td>白馒头</td><td>半个杂粮馒头</td></tr>
+          <tr><td>白面条</td><td>荞麦面/全麦面 + 多加菜和蛋白</td></tr>
+          <tr><td>粥类</td><td>不熬太烂；少喝白粥，改杂豆/燕麦饭</td></tr>
+        </table>
+        <div class="alert-box">⚠️ 土豆、红薯、山药、玉米也算主食。吃了需等量减少米饭面条。</div>
+        <p style="margin-top:10px;"><strong>🍽️ 科学进食顺序：</strong></p>
+        <ol class="step-list">
+          <li>🥬 蔬菜（绿叶菜/菌菇/瓜茄类先吃一大口）</li>
+          <li>🥩🥚 蛋白质（鱼虾/蛋/瘦肉/豆腐/奶再吃适量）</li>
+          <li>🍚🌽 主食（米饭/面条/薯类最后下肚）</li>
+        </ol>
+        <div class="tip-box">原理：纤维垫底 + 蛋白延缓胃排空 → 血糖更平稳。</div>
+      </section>
+
+      <!-- 运动指南 -->
+      <section class="card">
+        <h3 class="exercise">🏃 运动指南</h3>
+        <p>运动能直接消耗血糖、增加肌肉储糖、改善胰岛素抵抗、缩小血糖波动。</p>
+        <ul style="margin-top:10px;">
+          <li><strong>🫁 有氧运动</strong>：每周 ≥150分钟（5天×30分钟）。强度：微喘但能说话，不能唱歌。<br><span style="color:var(--text-sub); font-size:0.9rem;">推荐：快走、骑车、游泳/水中走、太极、健身操、缓坡上坡（膝不适避免下坡）</span></li>
+          <li><strong>💪 力量训练</strong>：每周 ≥2次，每次20-30分钟。保肌肉 = 保降糖能力。<br><span style="color:var(--text-sub); font-size:0.9rem;">推荐：靠墙半蹲、坐椅起立、弹力带划船、举小水瓶、踮脚提踵（动作慢，安全第一）</span></li>
+          <li><strong>🕒 餐后黄金窗口</strong>：饭后30-60分钟散步10-20分钟，对控制餐后血糖效果极佳。避免饭后立刻躺下。</li>
+        </ul>
+        <div class="alert-box">* 膝/心/眼底/足部有问题者，请先咨询医生再制定计划。</div>
+      </section>
+
+      <!-- 饮食清单 -->
+      <section class="card">
+        <h3 class="diet">🥗 护血糖饮食清单</h3>
+        <p>目标不是“吃苦”，而是让餐盘更稳。</p>
+        <ul>
+          <li><strong>🥬 新鲜蔬菜</strong>：菠菜/油麦菜/西兰花/黄瓜/番茄/菌菇/海带等。（土豆/山药/莲藕/南瓜/玉米偏主食，需计入碳水）</li>
+          <li><strong>🐟 Omega-3</strong>：每周2次鱼（三文鱼/沙丁鱼等），少油炸。搭配核桃/亚麻籽/奇亚籽。</li>
+          <li><strong>🫐 多酚类</strong>：深色天然食物、无糖茶、美式咖啡（早少量）、橄榄油/坚果（控量）。</li>
+          <li><strong>🥛 发酵类</strong>：无糖酸奶、低盐豆制品。高血压者少吃泡菜/酸菜。</li>
+        </ul>
+      </section>
+
+      <!-- 睡眠 & 内脏脂肪 -->
+      <section class="card">
+        <h3 class="sleep">😴 睡眠 & 内脏脂肪</h3>
+        <p><strong>睡眠影响：</strong>睡不好 → 压力激素↑ → 胰岛素抵抗加重。</p>
+        <ul>
+          <li>⏱️ <strong>作息规律</strong>：固定睡起时间，周末不大幅熬夜。</li>
+          <li>📏 <strong>睡眠时长</strong>：成人建议 7-9 小时。</li>
+          <li>📊 <strong>睡眠质量</strong>：卧床8小时 ≠ 睡8小时。记录入睡/夜醒/白天困倦。打鼾憋醒请排查睡眠呼吸暂停。</li>
+        </ul>
+        <hr style="border:0; border-top:1px dashed var(--border); margin:16px 0;">
+        <p><strong>📉 内脏脂肪：</strong>隐藏的“炎症器官”。腰围缩小比体重减轻更有临床意义。肚子越大，胰岛素越累。</p>
+      </section>
+
+      <!-- 监测指标 -->
+      <section class="card">
+        <h3 class="monitor">📊 核心监测指标</h3>
+        <p><strong>🩸 空腹血糖</strong>：反映晨起状态，易受前晚饮食/睡眠/情绪影响。反复偏高需重视。</p>
+        <p><strong>📈 糖化血红蛋白 (HbA1c)</strong>：反映过去2-3个月平均血糖，看长期趋势更准确。</p>
+        <div class="tip-box">💡 趋势比单次数值更重要！建议连续记录半年至一年，医生将据此评估干预效果。</div>
+        <table class="tracking">
+          <tr>
+            <th>日期</th><th>体重(kg)</th><th>腰围(cm)</th><th>空腹血糖</th><th>HbA1c(%)</th>
+          </tr>
+          <tr><td>2026-__-__</td><td><input type="text" placeholder="___"></td><td><input type="text" placeholder="___"></td><td><input type="text" placeholder="___ mmol/L"></td><td><input type="text" placeholder="___ %"></td></tr>
+          <tr><td>____-__-__</td><td><input type="text" placeholder="___"></td><td><input type="text" placeholder="___"></td><td><input type="text" placeholder="___ mmol/L"></td><td><input type="text" placeholder="___ %"></td></tr>
+          <tr><td>____-__-__</td><td><input type="text" placeholder="___"></td><td><input type="text" placeholder="___"></td><td><input type="text" placeholder="___ mmol/L"></td><td><input type="text" placeholder="___ %"></td></tr>
+        </table>
+      </section>
+
+      <!-- 一日执行 -->
+      <section class="card" style="grid-column: 1 / -1;">
+        <h3 class="daily">📅 一日执行参考模板</h3>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-top:14px;">
+          <div style="background:var(--primary-light); padding:16px; border-radius:12px; border:1px solid #bfdbfe;">
+            <strong>🌅 早餐</strong><br>先蛋白，再主食：鸡蛋+无糖豆浆/奶+杂粮主食+蔬菜。<span style="color:var(--danger);">避开：白粥咸菜、油条、甜豆浆、糕点。</span>
+          </div>
+          <div style="background:var(--success-light); padding:16px; border-radius:12px; border:1px solid #a7f3d0;">
+            <strong>☀️ 午餐</strong><br>按顺序：蔬菜半盘 → 鱼肉蛋豆一掌心 → 主食半到一碗（一半粗粮）。
+          </div>
+          <div style="background:var(--warning-light); padding:16px; border-radius:12px; border:1px solid #fde68a;">
+            <strong>🌙 晚餐 & 加餐</strong><br>晚餐不晚不撑，饭后走10-20分钟。饿时选：无糖酸奶/少量坚果/小苹果/黄瓜番茄。<span style="color:var(--danger);">避开：饼干蛋糕、奶茶果汁。</span>
+          </div>
+          <div style="background:#f3f4f6; padding:16px; border-radius:12px; border:1px solid #e5e7eb;">
+            <strong>🔄 日常活动</strong><br>能走就走，能站不坐。每坐30分钟起身1-5分钟。每周落实：有氧150分钟 + 力量2次 + 柔韧平衡训练。
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="reminders">
+      <h2>🌟 最重要的提醒</h2>
+      <ul>
+        <li>防治不是“不吃饭”，而是<strong>“吃得稳”</strong>。</li>
+        <li>主食不是敌人，<strong>精制过量与大波动</strong>才是问题。</li>
+        <li>肌肉是降糖的朋友，<strong>要用运动保住肌肉</strong>。</li>
+        <li>肚子越大，胰岛素越累；<strong>腰围管理优先于体重</strong>。</li>
+        <li>睡眠、压力、久坐都会暗中推高血糖。</li>
+        <li>体检看趋势，不盯单次结果。</li>
+        <li>生活方式是根基，药物是工具。根基不稳，单靠药难长效。</li>
+        <li>🚫 <strong>已用药者切勿自行停药，减药必须由医生评估。</strong></li>
+        <li>✨ 最好的办法不是追求完美，而是<strong>每天做对一点点，长期坚持</strong>。✨</li>
+      </ul>
+    </section>
+
+    <footer>
+      📖 本文内容为健康生活方式科普，不能替代专业医疗诊断与治疗建议。请遵医嘱定期复查与个体化管理。
+    </footer>
+  </main>
+</body>
+</html>
