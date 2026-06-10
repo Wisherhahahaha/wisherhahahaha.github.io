@@ -254,7 +254,7 @@ Examples of relatively polar (and thus watersoluble) compounds, which will be fr
 
 ## Box 1.1 Ionisation state of some acids at normal hydrogen ion concentrations
 
-The normal pH in blood plasma is around 7.4. (It may be somewhat lower within cells, down to about 6.8.) This corresponds to a hydrogen ion concentration of $\dot { 3 } . 9 8 \times 1 0 ^ { - 8 }$ mo $| ^ { - 1 }$ (since $- \log _ { 1 0 }$ of $3 . 9 8 \times 1 0 ^ { - 8 }$ is 7.4). 
+The normal pH in blood plasma is around 7.4. (It may be somewhat lower within cells, down to about 6.8.) This corresponds to a hydrogen ion concentration of $3.98 \times 10^{-8}$ mol L⁻¹ (since $-\log_{10}$ of $3.98 \times 10^{-8}$ is 7.4).
 
 The equation for ionisation of an acid HA is: 
 
@@ -280,7 +280,7 @@ $$
 K _ {\mathrm{a}} = 1. 7 5 \times 1 0 ^ {- 5} = \frac {[ \mathrm{H} ^ {+} ] [ \mathrm{Ac} ^ {-} ]}{[ \mathrm{HAc} ]}
 $$
 
-(where HAc represents undissociated acetic acid, Ac− represents the acetate ion). At pH 7.4, $[ \mathsf { H } ^ { + } ] = 3 . 9 8 \times 1 0 ^ { - 8 }$ mol $| ^ { - 1 }$ . Therefore, 
+(where HAc represents undissociated acetic acid, Ac⁻ represents the acetate ion). At pH 7.4, [H⁺] = 3.98 × 10⁻⁸ mol L⁻¹. Therefore,
 
 $$
 \frac {[ \mathrm{Ac} ^ {-} ]}{[ \mathrm{HAc} ]} = \frac {1 . 7 5 \times 1 0 ^ {- 5}}{3 . 9 8 \times 1 0 ^ {- 8}} = 4 4 0
