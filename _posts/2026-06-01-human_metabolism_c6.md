@@ -172,13 +172,6 @@ The adrenal glands, situated above each kidney, are each divided into a core, th
 
 •	 There are several distinct branches of the nervous system. The autonomic nervous system includes the sympathetic nervous system, which mainly acts on metabolism to mobilise stored fuels, and the parasympathetic nervous system, whose effects on metabolism generally oppose those of the sympathetic and might be considered anabolic. 
 
-(Continued) 
-
-![image](/assets/images/human_metabolism_images/009d16a09cfbe259babb2e516783fa41.jpg)
-
-
-## Key learning points (continued)
-
 The somatic nervous system connects the brain to the skeletal muscles and brings about muscle contraction. The afferent nervous system consists of nerves bringing signals from peripheral tissues back to the brain. The enteric nervous system is the complex nervous system of the gut and regulates intestinal function. 
 
 The actions of nerves are brought about by release of chemicals known as neurotransmitters, which act on specific receptors in target tissues. The junction between a nerve cell and a target tissue (which may be another nerve) is called a synapse. 
