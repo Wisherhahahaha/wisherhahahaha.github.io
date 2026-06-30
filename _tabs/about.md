@@ -16,4 +16,5 @@ order: 4
 
 ### misc
 
+- [menopause](/misc/menopause.html)
 - [diabetes](/misc/diabetes.html)

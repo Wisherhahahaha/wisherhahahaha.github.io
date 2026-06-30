@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>更年期医学管理指南</title>
+  <style>
+    :root {
+      --primary: #c026d3;
+      --primary-light: #fae8ff;
+      --secondary: #8b5cf6;
+      --secondary-light: #ede9fe;
+      --success: #059669;
+      --success-light: #d1fae5;
+      --warning: #d97706;
+      --warning-light: #fef3c7;
+      --danger: #dc2626;
+      --danger-light: #fee2e2;
+      --teal: #0f766e;
+      --teal-light: #ccfbf1;
+      --bg: #fdf8fb;
+      --card-bg: #ffffff;
+      --text-main: #1f2937;
+      --text-sub: #4b5563;
+      --border: #eadbe8;
+      --radius: 16px;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at 10% 0%, #fff1f7 0, transparent 28%),
+        radial-gradient(circle at 90% 12%, #f3e8ff 0, transparent 26%),
+        var(--bg);
+      color: var(--text-main);
+      line-height: 1.65;
+      padding: 20px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .infographic {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      padding: 30px 10px 20px;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.65rem);
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: 6px;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      font-size: 1.08rem;
+      color: var(--text-sub);
+      margin-bottom: 22px;
+    }
+
+    .core-box {
+      background: linear-gradient(135deg, var(--primary-light), var(--secondary-light));
+      border: 2px solid var(--primary);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 32px;
+      text-align: left;
+      box-shadow: var(--shadow);
+    }
+
+    .core-box h2 {
+      font-size: 1.25rem;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .core-box p { margin-bottom: 8px; }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid #f0abfc;
+      background: #fff;
+      color: #86198f;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.10);
+    }
+
+    .card h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card h3.symptom { border-color: var(--primary); color: var(--primary); }
+    .card h3.bone { border-color: var(--secondary); color: var(--secondary); }
+    .card h3.risk { border-color: var(--warning); color: var(--warning); }
+    .card h3.treatment { border-color: var(--success); color: var(--success); }
+    .card h3.lifestyle { border-color: var(--teal); color: var(--teal); }
+    .card h3.warning-title { border-color: var(--danger); color: var(--danger); }
+    .card h3.prepare { border-color: #6d28d9; color: #6d28d9; }
+
+    ul { list-style: none; padding-left: 0; }
+
+    ul li {
+      padding: 8px 0;
+      border-bottom: 1px dashed var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.98rem;
+    }
+
+    ul li:last-child { border-bottom: none; }
+
+    .highlight {
+      background: var(--warning-light);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      color: #92400e;
+    }
+
+    .pink-highlight {
+      background: var(--primary-light);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      color: #86198f;
+    }
+
+    .alert-box {
+      background: var(--danger-light);
+      border-left: 4px solid var(--danger);
+      padding: 12px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+      font-size: 0.95rem;
+      color: #991b1b;
+    }
+
+    .tip-box {
+      background: var(--success-light);
+      border-left: 4px solid var(--success);
+      padding: 12px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+      font-size: 0.95rem;
+      color: #065f46;
+    }
+
+    .note-box {
+      background: var(--secondary-light);
+      border-left: 4px solid var(--secondary);
+      padding: 12px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+      font-size: 0.95rem;
+      color: #4c1d95;
+    }
+
+    .step-list {
+      list-style: none;
+      counter-reset: step;
+      margin-top: 8px;
+    }
+
+    .step-list li {
+      counter-increment: step;
+      border-bottom: 1px dashed var(--border);
+    }
+
+    .step-list li::before {
+      content: counter(step);
+      background: var(--primary);
+      color: white;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: bold;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .mini-card {
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .mini-card strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .stat {
+      text-align: center;
+      border: 1px solid #f5c2d5;
+      background: #fff7fb;
+      border-radius: 12px;
+      padding: 14px 8px;
+    }
+
+    .stat b {
+      display: block;
+      font-size: 1.8rem;
+      line-height: 1.1;
+      color: var(--primary);
+    }
+
+    .stat span {
+      font-size: 0.85rem;
+      color: #8a3a5c;
+      font-weight: 700;
+    }
+
+    .replace-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 0.95rem;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .replace-table th,
+    .replace-table td {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .replace-table th {
+      background: var(--primary-light);
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .replace-table tr:nth-child(even) { background: #fdf7fb; }
+
+    .chart-card {
+      background: linear-gradient(180deg, #fff7fb, #fff);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-sub);
+    }
+
+    .reminders {
+      background: linear-gradient(135deg, #3b0764, #581c87, #7e22ce);
+      color: white;
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      margin-top: 24px;
+      box-shadow: 0 8px 20px -5px rgb(0 0 0 / 0.25);
+    }
+
+    .reminders h2 {
+      font-size: 1.6rem;
+      margin-bottom: 18px;
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    .reminders ul {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 8px 24px;
+    }
+
+    .reminders ul li {
+      border-bottom-color: rgba(255,255,255,0.22);
+      color: #f5e8ff;
+      padding: 10px 0;
+    }
+
+    .reminders ul li strong {
+      color: #fde68a;
+      font-weight: 800;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px 10px;
+      color: var(--text-sub);
+      font-size: 0.9rem;
+      border-top: 1px solid var(--border);
+      margin-top: 24px;
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 12px; }
+      .grid { grid-template-columns: 1fr; gap: 18px; }
+      .card { padding: 18px; }
+      .stat-grid { grid-template-columns: 1fr; }
+      .reminders ul { grid-template-columns: 1fr; }
+      .replace-table { font-size: 0.86rem; }
+    }
+
+    @media print {
+      body { background: white; padding: 0; color: #000; }
+      .infographic { max-width: 100%; }
+      .card, .core-box, .reminders {
+        box-shadow: none;
+        border: 1px solid #ccc;
+        break-inside: avoid;
+        background: white;
+        color: black;
+      }
+      .reminders { background: #f8f9fa; }
+      .reminders ul li { border-bottom-color: #ddd; color: #000; }
+      .reminders ul li strong { color: #000; border-bottom: 2px solid #000; }
+      .alert-box, .tip-box, .note-box, .highlight, .pink-highlight { background: #f0f0f0; border-left-color: #666; color: #000; }
+      header, .grid, .reminders, footer { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="infographic">
+    <header>
+      <h1>🌸 更年期综合管理指南</h1>
+      <p class="subtitle">识别症状 · 评估风险 · 规范干预 · 长期护骨</p>
+    </header>
+
+    <div class="core-box">
+      <h2>💡 核心认知</h2>
+      <p><strong>更年期不是“忍一忍就过去”的阶段，而是身体进入激素与代谢重新平衡的换挡期。</strong></p>
+      <p>⚠️ <strong>关键原则</strong>：绝经后骨质疏松，常常没有明显症状，却可能通过<span class="highlight">脆性骨折</span>造成严重后果。</p>
+      <div class="tag-row">
+        <span class="tag">潮热盗汗</span>
+        <span class="tag">睡眠与情绪</span>
+        <span class="tag">骨密度评估</span>
+        <span class="tag">防跌倒与防骨折</span>
+        <span class="tag">绝经激素治疗 MHT</span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h3 class="symptom">🔥 雌激素下降后的常见表现</h3>
+        <ul>
+          <li>🔥 <strong>血管舒缩症状</strong>潮热、出汗、夜间盗汗，常影响工作与睡眠。</li>
+          <li>🌙 <strong>神经精神症状</strong>入睡难、易醒、焦虑、易怒、情绪低落、记忆力下降或“脑雾”。</li>
+          <li>💧 <strong>泌尿生殖道综合征</strong>阴道干涩、性交痛、尿频尿急、反复泌尿感染，绝经后可长期存在。</li>
+          <li>❤️ <strong>心血管与代谢变化</strong>血压血脂更易异常，腹型肥胖和胰岛素抵抗风险增加。</li>
+        </ul>
+        <div class="note-box">45岁后出现典型症状时，评估重点通常是临床表现与月经变化。激素水平波动较大，单次抽血不能完全代表整体状态。</div>
+      </section>
+
+      <section class="card">
+        <h3 class="bone">🦴 隐形危机：绝经后骨质疏松</h3>
+        <p>绝经后雌激素下降会加速骨量丢失，女性骨质疏松风险随年龄上升明显加快。最大的风险是<span class="pink-highlight">跌倒后脆性骨折</span>。</p>
+        <div class="stat-grid">
+          <div class="stat"><span>女性患者约</span><b>7000万</b></div>
+          <div class="stat"><span>知晓率</span><b>7.4%</b></div>
+          <div class="stat"><span>诊断率</span><b>6.4%</b></div>
+        </div>
+        <div class="chart-card">
+          <div class="legend"><span style="color:var(--primary)">● 女性患病率</span><span style="color:var(--secondary)">● 男性患病率</span></div>
+          <svg viewBox="0 0 720 280" width="100%" height="245" preserveAspectRatio="none" role="img" aria-label="骨质疏松患病率随年龄变化示意图">
+            <g stroke="#eee5eb" stroke-width="1">
+              <line x1="60" y1="208" x2="680" y2="208"/>
+              <line x1="60" y1="148" x2="680" y2="148"/>
+              <line x1="60" y1="88" x2="680" y2="88"/>
+            </g>
+            <line x1="60" y1="238" x2="680" y2="238" stroke="#d8c7d5" stroke-width="1"/>
+            <line x1="60" y1="30" x2="60" y2="238" stroke="#322b32" stroke-width="2"/>
+            <g font-size="13" fill="#7c7480" text-anchor="middle">
+              <text x="135" y="260">40-49岁</text><text x="270" y="260">50-59岁</text><text x="405" y="260">60-69岁</text><text x="540" y="260">70-79岁</text><text x="650" y="260">≥80岁</text>
+            </g>
+            <polyline points="135,223 270,190 405,125 540,92 650,38" stroke="var(--primary)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="135,232 270,225 405,222 540,202 650,172" stroke="var(--secondary)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <g fill="var(--primary)"><circle cx="135" cy="223" r="6"/><circle cx="270" cy="190" r="6"/><circle cx="405" cy="125" r="6"/><circle cx="540" cy="92" r="6"/><circle cx="650" cy="38" r="6"/></g>
+            <g fill="var(--secondary)"><circle cx="135" cy="232" r="6"/><circle cx="270" cy="225" r="6"/><circle cx="405" cy="222" r="6"/><circle cx="540" cy="202" r="6"/><circle cx="650" cy="172" r="6"/></g>
+            <text x="640" y="24" fill="var(--primary)" font-size="24" font-weight="900" text-anchor="middle">67.5%</text>
+            <text x="640" y="156" fill="var(--secondary)" font-size="24" font-weight="900" text-anchor="middle">21.9%</text>
+          </svg>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3 class="risk">🎯 骨密度评估</h3>
+        <p style="margin-bottom:10px; color:var(--text-sub);">以下任一条为“是”，建议咨询医生是否需要 DXA 骨密度评估。</p>
+        <ul>
+          <li>👵 女性超过60岁，或 BMI 低于19。</li>
+          <li>⏱️ 40岁前出现早发性卵巢功能不全或过早绝经。</li>
+          <li>👨‍👩‍👧 父母有髋部骨折史。</li>
+          <li>🦴 50岁后有骨折史，或40岁后身高变矮超过4cm。</li>
+          <li>💊 长期使用糖皮质激素。</li>
+          <li>🩺 合并类风湿、糖尿病、甲状腺疾病、慢性肾病等。</li>
+        </ul>
+        <div class="tip-box">趋势比单次感受更重要：身高、体重、跌倒史、骨密度和用药史都应连续记录。</div>
+      </section>
+
+      <section class="card">
+        <h3 class="treatment">🚦 MHT 与医学干预红绿灯</h3>
+        <p>绝经激素治疗（MHT）既可缓解潮热失眠，也可帮助预防骨质疏松，但必须经过医生个体化评估。</p>
+        <table class="replace-table">
+          <tr><th>分区</th><th>适用情况</th><th>处理建议</th></tr>
+          <tr><td>🟢 绿灯</td><td>年龄＜60岁且绝经＜10年；症状明显；无血栓/肿瘤等禁忌</td><td>建议到更年期门诊或妇科内分泌门诊评估 MHT</td></tr>
+          <tr><td>🟡 黄灯</td><td>仅阴道干涩、反复尿路感染；或合并高血压、肥胖等风险</td><td>可评估局部治疗；系统治疗需更谨慎</td></tr>
+          <tr><td>🔴 红灯</td><td>乳腺癌、内膜癌、近期心梗/血栓、不明原因出血等</td><td>避免自行用激素，医生会考虑非激素方案或抗骨松专药</td></tr>
+        </table>
+        <div class="alert-box">🚫 不要自行购买“天然激素”“私护产品”或三无保健品替代正规治疗。</div>
+      </section>
+
+      <section class="card">
+        <h3 class="lifestyle">🥛 膳食、运动与防跌倒</h3>
+        <p>目标不是单一“补钙”，而是让骨骼获得足够原料、刺激和保护。</p>
+        <ul>
+          <li><strong>🥛 钙与维D</strong>：优先通过奶类、豆制品、绿叶菜补充；不足时遵医嘱补充钙剂和维D。</li>
+          <li><strong>🐟 优质蛋白</strong>：鱼、禽、蛋、豆制品合理搭配；控制盐、糖和酒精，减少钙流失。</li>
+          <li><strong>🏋️ 抗阻 + 负重训练</strong>：走路之外加入弹力带、哑铃、靠墙深蹲、坐椅起立等力量训练。</li>
+          <li><strong>⚖️ 平衡训练</strong>：太极、八段锦、单脚站立等可降低跌倒风险。</li>
+          <li><strong>🧘 避免高风险动作</strong>：重度骨松者避免脊柱过度弯曲、扭转或高冲撞运动。</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h3 class="warning-title">🚨 红旗信号：不要观望</h3>
+        <ul>
+          <li>🩸 <strong>绝经后阴道再次出血</strong>：停经满12个月后又出血，需要排查内膜病变。</li>
+          <li>📏 <strong>明显变矮或驼背</strong>：可能提示椎体压缩性骨折。</li>
+          <li>🦴 <strong>轻微外力后骨折</strong>：比如摔一跤、搬重物后骨折，提示骨松高危。</li>
+          <li>❤️ <strong>胸痛、气短、单侧腿肿痛</strong>：需要排查心血管事件或血栓。</li>
+          <li>🦵 <strong>跌倒后髋部剧痛无法站立</strong>：髋部骨折风险高，应立即就医。</li>
+        </ul>
+        <div class="alert-box">出现上述情况，请尽快前往正规医院，而不是先自行服药或等待恢复。</div>
+      </section>
+
+      <section class="card">
+        <h3 class="prepare">🧾 就诊前准备清单</h3>
+        <p style="margin-bottom:10px; color:var(--text-sub);">带好信息，能显著提高问诊效率。</p>
+        <ol class="step-list">
+          <li><strong>月经与症状记录</strong>：末次月经时间、停经多久、最困扰的症状、持续时间。</li>
+          <li><strong>体检报告</strong>：乳腺超声/钼靶、妇科 TCT/HPV、生化、血脂、肝肾功能等。</li>
+          <li><strong>骨健康资料</strong>：身高变化、跌倒/骨折史、骨密度报告、维D/钙相关检查。</li>
+          <li><strong>家族病史</strong>：直系亲属肿瘤、血栓、髋部骨折或严重骨质疏松史。</li>
+          <li><strong>用药清单</strong>：慢病药、激素类药物、保健品和既往过敏史。</li>
+        </ol>
+      </section>
+    </div>
+
+    <section class="reminders">
+      <h2>🌟 最重要的提醒</h2>
+      <ul>
+        <li>更年期不是矫情，症状严重时应<strong>主动评估</strong>。</li>
+        <li>绝经后最大的长期风险之一是<strong>骨质疏松和脆性骨折</strong>。</li>
+        <li>单次检查不能替代症状、月经史和整体风险评估。</li>
+        <li>MHT 不是人人都能用，也不是人人都不能用，关键在<strong>时间窗与禁忌证评估</strong>。</li>
+        <li>补钙只是基础，骨骼更需要<strong>力量训练、维D、蛋白和防跌倒</strong>。</li>
+        <li>绝经后出血、变矮、轻微外力骨折、胸痛气短都不是小事。</li>
+        <li>保健品不能替代正规诊疗，尤其不要自行使用来路不明的激素类产品。</li>
+        <li>最好的管理不是追求完美，而是<strong>记录趋势、定期复查、持续执行</strong>。</li>
+      </ul>
+    </section>
+
+    <footer>
+      📖 本页为健康科普与就医沟通辅助，不能替代专业医疗诊断、处方或个体化治疗。涉及 MHT、抗骨质疏松药物或异常出血等问题，请咨询正规医院妇科内分泌/更年期门诊或骨质疏松专科。
+    </footer>
+  </main>
+</body>
+</html>
