@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>专业拼豆图纸生成器 (智能全色系版)</title>
+  <style>
+    /* 采用参考UI的清新绿调主题 */
+    :root {
+      --bg: #f4f6f8;
+      --panel: #fff;
+      --text: #1f2329;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --brand: #16c36a;
+      --brand2: #0ea55a;
+      --shadow: 0 10px 28px rgba(17,24,39,.08);
+      --radius: 16px;
+      --mono: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+      --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    
+    header { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.92); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+    .topbar { max-width: 1440px; margin: 0 auto; padding: 13px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .title { font-size: 20px; font-weight: 850; display:flex; align-items:center;}
+    .title span { font-size: 11px; font-weight: 700; color: #fff; background: var(--brand); padding: 3px 8px; border-radius: 6px; margin-left: 10px; }
+    
+    button, .filebtn, select, input[type="number"] { border: 1px solid var(--line); height: 38px; border-radius: 11px; background: #fff; color: var(--text); font-size: 14px; padding: 0 12px; outline: none; }
+    button, .filebtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; font-weight: 700; white-space: nowrap; transition: 0.2s; }
+    button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+    button.primary:hover { background: var(--brand2); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    
+    input[type=file] { display: none; }
+    input[type=range] { width: 100%; accent-color: var(--brand); }
+    
+    main { max-width: 1440px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: 380px minmax(0,1fr); gap: 16px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); position:relative;}
+    .left { padding: 16px; position: sticky; top: 82px; height: calc(100vh - 100px); overflow: auto; }
+    .right { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+    
+    h2 { font-size: 16px; margin: 0 0 12px; color:#111827; font-weight: 800;}
+    .field { display: grid; grid-template-columns: 110px minmax(0,1fr); gap: 10px; align-items: center; margin: 10px 0; }
+    .field label { font-size: 13px; color: #374151; font-weight: 600;}
+    .slider { display: grid; grid-template-columns: 1fr 42px; gap: 10px; align-items: center; }
+    .value { text-align: right; font-family: var(--mono); font-size: 13px; color: #4b5563; background:#f3f4f6; padding:2px 6px; border-radius:6px;}
+    
+    .drop { border: 1.5px dashed #cbd5e1; border-radius: 14px; background: #fafafa; min-height: 126px; padding: 16px; display: grid; place-items: center; text-align: center; cursor: pointer; transition: .2s; }
+    .drop:hover { border-color: var(--brand); background: #f0fdf4; }
+    .drop.has { padding: 0; background: #111; border-style: solid; overflow: hidden; }
+    .drop img { max-width: 100%; max-height: 230px; display: block; }
+    
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 14px; }
+    .stat { border: 1px solid var(--line); background: #fbfbfc; border-radius: 14px; padding: 12px; }
+    .stat b { font-size: 20px; display: block; margin-bottom: 4px; font-family: var(--mono); color:#111827;}
+    .stat span { font-size: 12px; color: var(--muted); font-weight: 600;}
+    
+    .toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); background:#fafafa; border-radius: var(--radius) var(--radius) 0 0;}
+    .status-badge { font-size: 12px; padding: 4px 10px; border-radius: 20px; background: #e5e7eb; color: #4b5563; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .status-badge.active { background: #fef08a; color: #854d0e; }
+    .status-badge.done { background: #dcfce7; color: #166534; }
+    .progress-track { width: 120px; height: 6px; background: rgba(0,0,0,0.1); border-radius: 4px; overflow: hidden; display: none; }
+    .status-badge.active .progress-track { display: block; }
+    .progress-fill { height: 100%; background: #ca8a04; width: 0%; transition: width 0.15s ease-out; }
+    
+    .canvasShell { height: calc(100vh - 280px); min-height: 500px; overflow: auto; background: #eef1f4; border-radius: 0 0 var(--radius) var(--radius); padding: 18px; cursor: crosshair; }
+    .canvasStage { display: inline-block; background: white; box-shadow: 0 8px 24px rgba(0,0,0,.14); transform-origin: top left; }
+    canvas { display: block; image-rendering: pixelated; }
+    
+    .tablewrap { padding: 14px; max-height: 280px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 9px 8px; text-align: left; }
+    th { background: #fafafa; color: #4b5563; position: sticky; top: 0; font-weight: 600; box-shadow: 0 1px 0 var(--line);}
+    
+    /* 选色交互样式 */
+    .color-row { cursor: pointer; transition: 0.1s; background: #fff;}
+    .color-row:hover { background: #f9fafb; }
+    .color-row.active { background: #f0fdf4 !important; }
+    .color-row.active td { font-weight: 700; color: var(--brand2); }
+    
+    .swatch { width: 22px; height: 22px; border: 1px solid #cbd5e1; border-radius: 5px; display: inline-block; vertical-align: middle; margin-right: 8px; }
+    .kbd { font-family: var(--mono); font-size: 12px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 1px 5px; }
+    
+    .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 14px; border-radius: 999px; opacity: 0; transition: .2s; z-index: 100; pointer-events: none; font-weight: 600;}
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(-10px); }
+    
+    .adv-box { background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 18px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="topbar">
+    <div class="title">专业拼豆图纸生成器 <span>136色连续场模型</span></div>
+    <div class="row">
+      <label class="filebtn">选择图片<input id="file" type="file" accept="image/*"></label>
+      <button class="primary" id="generate">开始智能生成</button>
+      <button id="exportFull" disabled>导出带色卡的图纸</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <aside class="panel left">
+    <div id="drop" class="drop"><span style="color:var(--muted); font-weight: 600;">点击或拖拽图片至此</span></div>
+
+    <h2 style="margin-top:20px">基础尺寸设置</h2>
+    <div class="field"><label>格子宽度</label><input id="gridWidth" type="number" min="10" max="320" value="64"></div>
+    <div class="field"><label>拼豆底板</label><select id="sectionSize"><option value="15">15 × 15 小板</option><option value="29" selected>29 × 29 大板</option><option value="50">50 × 50 融合板</option></select></div>
+
+    <div class="adv-box">
+      <h2>高级平滑设置 (算法调优)</h2>
+      <div class="field" title="值越大，相近颜色越容易聚集成大色块。"><label>色块聚集强度</label><div class="slider"><input id="couplingJ" type="range" min="0" max="10" value="2" step="0.5"><span id="couplingJv" class="value">2.0</span></div></div>
+      <div class="field" title="决定在颜色渐变处是否容忍断裂。"><label>边缘保留阈值</label><div class="slider"><input id="edgeGamma" type="range" min="10" max="100" value="50"><span id="edgeGammav" class="value">50</span></div></div>
+      <div class="field" title="自动消除单独的杂色豆子。"><label>孤立噪点消除</label><div class="slider"><input id="curvatureK" type="range" min="0" max="10" value="2" step="0.5"><span id="curvatureKv" class="value">2.0</span></div></div>
+    </div>
+    
+    <div class="field" style="margin-top:20px"><label>图纸显示缩放</label><div class="slider"><input id="screenZoom" type="range" min="20" max="400" value="100"><span id="screenZoomv" class="value">100%</span></div></div>
+  </aside>
+
+  <section class="right">
+    <section class="panel stats">
+      <div class="stat"><b id="statGrid">0×0</b><span>图纸尺寸</span></div>
+      <div class="stat"><b id="statTemp">0 %</b><span>智能优化进度</span></div>
+      <div class="stat"><b id="statBeads">0</b><span>总计需要豆子</span></div>
+      <div class="stat"><b id="statColors">0</b><span>使用颜色数</span></div>
+      <div class="stat"><b id="statEnergy">0.0</b><span>图像平滑指数</span></div>
+    </section>
+    
+    <section class="panel">
+      <div class="toolbar">
+        <b style="color:#111827;">图纸预览区 (生成后：点击下方颜色 -> 可直接在图上点绘涂改)</b>
+        <div id="statusBadge" class="status-badge">
+          <span id="statusText">等待输入</span>
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+      </div>
+      <div class="canvasShell" id="canvasShell"><div class="canvasStage" id="canvasStage"><canvas id="sheet"></canvas></div></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>颜色示例 (点击蘸取)</th><th>色号</th><th>刻印符号</th><th>使用数量</th></tr></thead>
+          <tbody id="colorList"></tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const drop = $("drop"), file = $("file"), sheet = $("sheet"), sctx = sheet.getContext("2d");
+  let img = null, result = null;
+  let animFrame = null, isAnimating = false;
+  let activeBrushIndex = null; 
+  let isDrawing = false;
+  let lastFrameTime = 0; const fpsInterval = 1000 / 30;
+
+  // 136色 专业拼豆色卡全集
+  function generateHugePalette() {
+    let p = [
+      ["W01","纯白","#ffffff"], ["W02","米白","#fdf6e3"], ["K01","极黑","#000000"], ["K02","深邃灰","#1c1917"],
+      ["G01","浅银灰","#e2e8f0"], ["G02","冷灰","#cbd5e1"], ["G03","中性灰","#94a3b8"], ["G04","深冷灰","#64748b"], ["G05","碳灰","#334155"],
+      ["G06","暖浅灰","#d6d3d1"], ["G07","暖中灰","#a8a29e"], ["G08","暖深灰","#57534e"],
+      ["S01","极浅肤","#fff1f2"], ["S02","桃红肤","#fce7f3"], ["S03","浅肉色","#fde0c4"], ["S04","标准肤","#facca6"], ["S05","日晒肤","#f3a683"], ["S06","深阴影肤","#d48b6e"]
+    ];
+    const hues = [0, 20, 35, 45, 60, 80, 120, 150, 180, 200, 220, 240, 270, 300, 330, 345];
+    const variants = [{s:30,v:95,p:"P"}, {s:60,v:95,p:"L"}, {s:90,v:95,p:"B"}, {s:80,v:70,p:"D"}, {s:70,v:45,p:"N"}, {s:30,v:60,p:"M"}];
+    hues.forEach((h, i) => {
+      let huePrefix = String.fromCharCode(65 + i); 
+      variants.forEach((v, j) => {
+        let rgb = hsvToRgb(h, v.s, v.v); let hex = rgbToHex(rgb);
+        p.push([huePrefix + v.p, `色相${h}-${v.p}`, hex]);
+      });
+    });
+    const symbolChars = "●▲■◆★✚✿✦○△□◇×+▧▩◐◑♣♥♠♢◎◍ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split('');
+    let palette = p.map((x,i) => {
+      let rgb = hexToRgb(x[2]);
+      return { code: x[0], name: x[1], hex: x[2], rgb: rgb, lab: rgbToLab(rgb), symbol: symbolChars[i % symbolChars.length], idx: i };
+    });
+    return palette;
+  }
+
+  function hsvToRgb(h, s, v) {
+    s /= 100; v /= 100;
+    let c = v * s; let x = c * (1 - Math.abs((h / 60) % 2 - 1)); let m = v - c;
+    let r=0,g=0,b=0;
+    if(0<=h && h<60){ r=c; g=x; b=0; } else if(60<=h && h<120){ r=x; g=c; b=0; } else if(120<=h && h<180){ r=0; g=c; b=x; }
+    else if(180<=h && h<240){ r=0; g=x; b=c; } else if(240<=h && h<300){ r=x; g=0; b=c; } else if(300<=h && h<360){ r=c; g=0; b=x; }
+    return { r: Math.round((r+m)*255), g: Math.round((g+m)*255), b: Math.round((b+m)*255) };
+  }
+  function rgbToHex({r,g,b}){ return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1); }
+  function hexToRgb(h){ const n=parseInt(h.slice(1),16); return {r:(n>>16)&255,g:(n>>8)&255,b:n&255}; }
+  function luma(r,g,b){ return 0.299*r + 0.587*g + 0.114*b; }
+  function rgbToLab({r,g,b}){
+    let r_ = r/255, g_ = g/255, b_ = b/255;
+    r_ = r_>0.04045 ? Math.pow((r_+0.055)/1.055, 2.4) : r_/12.92;
+    g_ = g_>0.04045 ? Math.pow((g_+0.055)/1.055, 2.4) : g_/12.92;
+    b_ = b_>0.04045 ? Math.pow((b_+0.055)/1.055, 2.4) : b_/12.92;
+    let x = (r_*0.4124+g_*0.3576+b_*0.1805)/0.95047, y = (r_*0.2126+g_*0.7152+b_*0.0722)/1.00000, z = (r_*0.0193+g_*0.1192+b_*0.9505)/1.08883;
+    x = x>0.008856 ? Math.cbrt(x) : 7.787*x + 16/116; y = y>0.008856 ? Math.cbrt(y) : 7.787*y + 16/116; z = z>0.008856 ? Math.cbrt(z) : 7.787*z + 16/116;
+    return { l: 116*y - 16, a: 500*(x-y), b: 200*(y-z) };
+  }
+  function deltaE94(l1, l2){
+    let dL = l1.l - l2.l, c1 = Math.sqrt(l1.a*l1.a + l1.b*l1.b), c2 = Math.sqrt(l2.a*l2.a + l2.b*l2.b), dC = c1 - c2;
+    let dH_sq = (l1.a - l2.a)**2 + (l1.b - l2.b)**2 - dC*dC; let dH = dH_sq > 0 ? Math.sqrt(dH_sq) : 0;
+    return Math.sqrt(dL*dL + (dC/(1+0.045*c1))**2 + (dH/(1+0.015*c1))**2);
+  }
+
+  function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),3000); }
+
+  drop.onclick = () => file.click();
+  file.onchange = e => {
+    const f=e.target.files[0]; if(!f) return;
+    const url=URL.createObjectURL(f), im=new Image();
+    im.onload=()=>{ img=im; drop.classList.add("has"); drop.innerHTML=`<img src="${url}">`; toast("图像加载完毕"); $("generate").disabled = false;};
+    im.src=url;
+  };
+
+  $("generate").onclick = () => {
+    if(!img) return;
+    if(isAnimating) { isAnimating = false; cancelAnimationFrame(animFrame); }
+    $("generate").disabled = true; $("exportFull").disabled = true;
+    $("statusBadge").className = "status-badge active"; $("statusText").textContent = "构建马尔可夫物理场...";
+    $("progressFill").style.width = "0%";
+    activeBrushIndex = null;
+    setTimeout(() => { setupPhysicalSystem(); }, 50);
+  };
+
+  let simState = {};
+  const FULL_PALETTE = generateHugePalette();
+  
+  // 【算法升级 2】预计算 136色之间的软距离耦合惩罚矩阵 [0, 1]
+  const COLOR_DIST = new Float32Array(FULL_PALETTE.length * FULL_PALETTE.length);
+  for(let i=0; i<FULL_PALETTE.length; i++) {
+    for(let j=0; j<FULL_PALETTE.length; j++) {
+        let de = deltaE94(FULL_PALETTE[i].lab, FULL_PALETTE[j].lab);
+        // DeltaE = 30 作为极大差异阈值，距离映射为 0 ~ 1 之间的平滑惩罚
+        COLOR_DIST[i * FULL_PALETTE.length + j] = Math.min(1.0, de / 30.0);
+    }
+  }
+
+  function setupPhysicalSystem() {
+    const gw = Number($("gridWidth").value), gh = Math.max(1, Math.round(gw / (img.width/img.height))), N = gw * gh;
+    
+    const tcv = document.createElement("canvas"); tcv.width = gw; tcv.height = gh;
+    const tctx = tcv.getContext("2d"); 
+    tctx.fillStyle = "#ffffff"; tctx.fillRect(0, 0, gw, gh); 
+    tctx.drawImage(img, 0, 0, gw, gh);
+    const srcData = tctx.getImageData(0,0,gw,gh).data;
+
+    let obsField = new Array(N);
+    for (let i = 0; i < N; i++) {
+        let pr = srcData[i*4], pg = srcData[i*4+1], pb = srcData[i*4+2];
+        if (srcData[i*4+3] < 128) { pr = 255; pg = 255; pb = 255; }
+        obsField[i] = rgbToLab({r: pr, g: pg, b: pb});
+    }
+
+    const numStates = FULL_PALETTE.length;
+    const E_data = new Float32Array(N * numStates);
+    const topK = new Int32Array(N * 10); 
+
+    for(let p=0; p<N; p++) {
+        let dists = [];
+        for(let k=0; k<numStates; k++) {
+            let e = deltaE94(obsField[p], FULL_PALETTE[k].lab);
+            E_data[p*numStates + k] = e;
+            dists.push({k: k, e: e});
+        }
+        dists.sort((a,b) => a.e - b.e);
+        for(let i=0; i<10; i++) topK[p*10 + i] = dists[i].k;
+    }
+
+    const W_right = new Float32Array(N), W_bottom = new Float32Array(N), W_dr = new Float32Array(N), W_dl = new Float32Array(N);
+    let gamma = Number($("edgeGamma").value);
+    
+    for(let y=0; y<gh; y++){
+        for(let x=0; x<gw; x++){
+            let p = y*gw + x;
+            if (x < gw - 1) W_right[p] = 1.0 / (1.0 + Math.pow(deltaE94(obsField[p], obsField[p+1]) / gamma, 2));
+            if (y < gh - 1) W_bottom[p] = 1.0 / (1.0 + Math.pow(deltaE94(obsField[p], obsField[p+gw]) / gamma, 2));
+            if (x < gw - 1 && y < gh - 1) W_dr[p] = 1.0 / (1.0 + Math.pow(deltaE94(obsField[p], obsField[p+gw+1]) / gamma, 2));
+            if (x > 0 && y < gh - 1) W_dl[p] = 1.0 / (1.0 + Math.pow(deltaE94(obsField[p], obsField[p+gw-1]) / gamma, 2));
+        }
+    }
+
+    let labels = new Int32Array(N);
+    for(let p=0; p<N; p++) labels[p] = topK[p*10]; 
+
+    simState = {
+        w: gw, h: gh, labels: labels, E_data: E_data, topK: topK,
+        W_right: W_right, W_bottom: W_bottom, W_dr: W_dr, W_dl: W_dl,
+        temp: 12.0, iter: 0, maxIter: 350 
+    };
+
+    $("statGrid").textContent = `${gw}×${gh}`;
+    $("statBeads").textContent = N;
+    $("statColors").textContent = new Set(labels).size;
+
+    isAnimating = true;
+    $("statusText").textContent = "正在结晶平滑...";
+    lastFrameTime = performance.now();
+    animFrame = requestAnimationFrame(animationLoop);
+  }
+
+  function animationLoop(timestamp) {
+    if(!isAnimating) return;
+    animFrame = requestAnimationFrame(animationLoop);
+    if (timestamp - lastFrameTime >= fpsInterval) {
+        lastFrameTime = timestamp - ((timestamp - lastFrameTime) % fpsInterval);
+        let changed = 0, totalEnergy = 0;
+        for(let step=0; step<2; step++) { let res = simulationStep(); changed += res.c; totalEnergy = res.e; }
+        updateUIAfterStep(changed, totalEnergy);
+    }
+  }
+
+  function simulationStep() {
+    let s = simState; s.temp *= 0.97;
+    let J = Number($("couplingJ").value) * 0.5;
+    let J_diag = J * 0.707;
+    let K_curve = Number($("curvatureK").value) * 0.5; 
+    
+    let changed = 0, totalEnergy = 0;
+    let candidateArr = new Int32Array(30); 
+    const numStates = FULL_PALETTE.length;
+
+    // 【算法升级 1】严格红黑空间更新，保证算法收敛稳定性
+    for(let phase = 0; phase < 2; phase++) {
+        for(let y=0; y<s.h; y++) {
+            for(let x=0; x<s.w; x++) {
+                if ((x + y) % 2 !== phase) continue;
+                let p = y*s.w + x, cCount = 0;
+                
+                let pushC = (k) => { for(let i=0; i<cCount; i++) if(candidateArr[i]===k) return; candidateArr[cCount++]=k; };
+                pushC(s.labels[p]);
+                for(let i=0; i<10; i++) pushC(s.topK[p*10 + i]); 
+                
+                if(x>0) pushC(s.labels[p-1]); if(x<s.w-1) pushC(s.labels[p+1]);
+                if(y>0) pushC(s.labels[p-s.w]); if(y<s.h-1) pushC(s.labels[p+s.w]);
+                if(x>0 && y>0) pushC(s.labels[p-s.w-1]); if(x<s.w-1 && y<s.h-1) pushC(s.labels[p+s.w+1]);
+                if(x<s.w-1 && y>0) pushC(s.labels[p-s.w+1]); if(x>0 && y<s.h-1) pushC(s.labels[p+s.w-1]);
+
+                let minH = Infinity, bestK = s.labels[p];
+                let P = new Float32Array(cCount), H_all = new Float32Array(cCount);
+
+                for(let i=0; i<cCount; i++) {
+                    let k = candidateArr[i];
+                    let H = s.E_data[p * numStates + k]; 
+                    let exactSameNeighbors = 0;
+
+                    // 【算法升级 2】软耦合：使用颜色真实色差(COLOR_DIST)作为排斥惩罚
+                    let getPenalty = (neighborLabel) => {
+                        if(k === neighborLabel) { exactSameNeighbors++; return 0; }
+                        return COLOR_DIST[k * numStates + neighborLabel];
+                    };
+
+                    if (x > 0) H += J * s.W_right[p-1] * getPenalty(s.labels[p-1]);
+                    if (x < s.w-1) H += J * s.W_right[p] * getPenalty(s.labels[p+1]);
+                    if (y > 0) H += J * s.W_bottom[p-s.w] * getPenalty(s.labels[p-s.w]);
+                    if (y < s.h-1) H += J * s.W_bottom[p] * getPenalty(s.labels[p+s.w]);
+                    
+                    if (x > 0 && y > 0) H += J_diag * s.W_dr[p-s.w-1] * getPenalty(s.labels[p-s.w-1]);
+                    if (x < s.w-1 && y < s.h-1) H += J_diag * s.W_dr[p] * getPenalty(s.labels[p+s.w+1]);
+                    if (x < s.w-1 && y > 0) H += J_diag * s.W_dl[p-s.w+1] * getPenalty(s.labels[p-s.w+1]);
+                    if (x > 0 && y < s.h-1) H += J_diag * s.W_dl[p] * getPenalty(s.labels[p+s.w-1]);
+
+                    // 严厉的物理曲率张力惩罚，消除实体单点杂色
+                    if (exactSameNeighbors <= 1) H += K_curve * 1.5;
+                    else if (exactSameNeighbors == 2) H += K_curve * 0.5;
+
+                    H_all[i] = H;
+                    if (H < minH) minH = H;
+                }
+
+                totalEnergy += minH;
+
+                if (s.temp > 0.5) {
+                    let sumP = 0;
+                    for(let i=0; i<cCount; i++) { P[i] = Math.exp(-(H_all[i] - minH) / s.temp); sumP += P[i]; }
+                    let r = Math.random() * sumP, cum = 0;
+                    for(let i=0; i<cCount; i++) { cum += P[i]; if (r <= cum) { bestK = candidateArr[i]; break; } }
+                } else {
+                    for(let i=0; i<cCount; i++) if (H_all[i] === minH) { bestK = candidateArr[i]; break; }
+                }
+
+                if (bestK !== s.labels[p]) changed++;
+                s.labels[p] = bestK;
+            }
+        }
+    }
+    s.iter++; return { c: changed, e: totalEnergy };
+  }
+
+  function updateUIAfterStep(changed, totalEnergy) {
+    let s = simState;
+    let progressPct = Math.min(100, Math.round((s.iter / s.maxIter) * 100));
+    $("statTemp").textContent = `${progressPct} %`;
+    $("statEnergy").textContent = (totalEnergy / 1000).toFixed(1);
+    $("progressFill").style.width = `${progressPct}%`;
+    $("statColors").textContent = new Set(s.labels).size;
+
+    renderCurrentState();
+
+    // 智能锁定修复：只要基态不再发生任何抖动变化，直接拉满进度并完成。
+    if(s.iter >= s.maxIter || (changed === 0 && s.temp < 1.0)) {
+        isAnimating = false;
+        $("statTemp").textContent = `100 %`;
+        $("statusBadge").className = "status-badge done"; 
+        $("statusText").textContent = "优化完成，可手动修改";
+        $("progressFill").style.width = "100%";
+        $("generate").disabled = false; $("exportFull").disabled = false;
+        toast("✨ 软耦合图纸生成完毕！点击下方颜色可进行涂抹修改。");
+        finalizeResult();
+    }
+  }
+
+  const CW = 22; 
+
+  function renderCurrentState() {
+    let s = simState; 
+    const previewCw = 14; 
+    sheet.width = s.w * previewCw; sheet.height = s.h * previewCw;
+    sctx.fillStyle="#fff"; sctx.fillRect(0,0,sheet.width,sheet.height);
+    for(let y=0; y<s.h; y++){
+      for(let x=0; x<s.w; x++){
+        sctx.fillStyle = FULL_PALETTE[s.labels[y*s.w+x]].hex; 
+        sctx.fillRect(x*previewCw, y*previewCw, previewCw, previewCw);
+      }
+    }
+    zoomUpdate();
+  }
+
+  function drawSingleCell(x, y, paletteObj) {
+    let px = x * CW, py = y * CW;
+    sctx.fillStyle = paletteObj.hex; 
+    sctx.fillRect(px, py, CW, CW);
+    
+    let isBg = (paletteObj.code === result.bgCode && luma(paletteObj.rgb.r, paletteObj.rgb.g, paletteObj.rgb.b) > 180);
+    let fontColor = luma(paletteObj.rgb.r, paletteObj.rgb.g, paletteObj.rgb.b) < 130 ? "#ffffff" : "#0f172a";
+    
+    sctx.fillStyle = isBg ? "rgba(0,0,0,0.04)" : fontColor;
+    sctx.font = "bold 13px sans-serif"; sctx.textAlign="center"; sctx.textBaseline="middle";
+    
+    if (!isBg) {
+        sctx.strokeStyle = fontColor === "#ffffff" ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.7)";
+        sctx.lineWidth = 2.5; sctx.lineJoin = "round";
+        sctx.strokeText(paletteObj.symbol, px+CW/2, py+CW/2+1);
+    }
+    sctx.fillText(paletteObj.symbol, px+CW/2, py+CW/2+1);
+  }
+
+  function renderFullGridLines() {
+    sctx.strokeStyle = "rgba(0,0,0,0.08)"; sctx.lineWidth=1; sctx.beginPath();
+    for(let x=0;x<=result.w;x++){sctx.moveTo(x*CW,0);sctx.lineTo(x*CW,sheet.height);}
+    for(let y=0;y<=result.h;y++){sctx.moveTo(0,y*CW);sctx.lineTo(sheet.width,y*CW);} sctx.stroke();
+
+    sctx.strokeStyle = "rgba(0,0,0,0.25)"; sctx.setLineDash([4, 4]); sctx.lineWidth=1.5; sctx.beginPath();
+    for(let x=0;x<=result.w;x+=5){sctx.moveTo(x*CW,0);sctx.lineTo(x*CW,sheet.height);}
+    for(let y=0;y<=result.h;y+=5){sctx.moveTo(0,y*CW);sctx.lineTo(sheet.width,y*CW);} sctx.stroke(); sctx.setLineDash([]); 
+
+    const bs = Number($("sectionSize").value) || 29;
+    sctx.strokeStyle = "rgba(0,0,0,0.7)"; sctx.lineWidth=2.5; sctx.beginPath();
+    for(let x=0;x<=result.w;x+=bs){sctx.moveTo(x*CW,0);sctx.lineTo(x*CW,sheet.height);}
+    for(let y=0;y<=result.h;y+=bs){sctx.moveTo(0,y*CW);sctx.lineTo(sheet.width,y*CW);} sctx.stroke(); 
+  }
+
+  function finalizeResult() {
+    let s = simState;
+    result = { w: s.w, h: s.h, cells: Array.from(s.labels) };
+    sheet.width = result.w * CW; sheet.height = result.h * CW;
+    sctx.fillStyle="#fff"; sctx.fillRect(0,0,sheet.width,sheet.height);
+    
+    let counts = {};
+    result.cells.forEach(idx => counts[idx] = (counts[idx]||0)+1);
+    let finalUsed = Object.entries(counts).map(([idx, count]) => ({...FULL_PALETTE[idx], count})).sort((a,b)=>b.count-a.count);
+    result.bgCode = finalUsed.length > 0 ? finalUsed[0].code : null;
+
+    for(let y=0; y<result.h; y++){
+      for(let x=0; x<result.w; x++){
+        drawSingleCell(x, y, FULL_PALETTE[result.cells[y*result.w+x]]);
+      }
+    }
+    renderFullGridLines();
+    updateColorTable();
+    zoomUpdate();
+  }
+
+  function updateColorTable() {
+    if(!result) return;
+    let counts = {}; result.cells.forEach(idx => counts[idx] = (counts[idx]||0)+1);
+    let finalUsed = Object.entries(counts).map(([idx, count]) => ({...FULL_PALETTE[idx], count})).sort((a,b)=>b.count-a.count);
+    
+    const tbody = $("colorList"); tbody.innerHTML="";
+    $("statColors").textContent = finalUsed.length;
+
+    finalUsed.forEach(c => {
+      let tr = document.createElement("tr");
+      tr.className = "color-row" + (activeBrushIndex === c.idx ? " active" : "");
+      tr.innerHTML = `<td><span class="swatch" style="background:${c.hex}"></span>${c.name}</td>
+                      <td><span class="kbd">${c.code}</span></td>
+                      <td style="font-size:14px;font-weight:700;color:#374151">${c.symbol}</td>
+                      <td><b style="color:#0ea55a">${c.count}</b></td>`;
+      tr.onclick = () => {
+        activeBrushIndex = c.idx;
+        updateColorTable(); 
+      };
+      tbody.appendChild(tr);
+    });
+  }
+
+  function handlePaint(e) {
+    if(isAnimating || !result || activeBrushIndex === null) return;
+    const rect = sheet.getBoundingClientRect();
+    const scale = Number($("screenZoom").value) / 100;
+    const x = Math.floor((e.clientX - rect.left) / scale / CW);
+    const y = Math.floor((e.clientY - rect.top) / scale / CW);
+    
+    if(x >= 0 && x < result.w && y >= 0 && y < result.h) {
+        let linearIdx = y * result.w + x;
+        if(result.cells[linearIdx] !== activeBrushIndex) {
+            result.cells[linearIdx] = activeBrushIndex;
+            drawSingleCell(x, y, FULL_PALETTE[activeBrushIndex]);
+            renderFullGridLines(); 
+        }
+    }
+  }
+
+  sheet.addEventListener('mousedown', (e) => {
+    if(!result || activeBrushIndex === null) {
+      if(result && !isAnimating) toast("请先在下方列表中点击选择一种颜色！");
+      return;
+    }
+    isDrawing = true; handlePaint(e);
+  });
+  sheet.addEventListener('mousemove', (e) => { if(isDrawing) handlePaint(e); });
+  window.addEventListener('mouseup', () => { 
+    if(isDrawing) { isDrawing = false; updateColorTable(); } 
+  });
+
+  function zoomUpdate(){ $("canvasStage").style.transform = `scale(${$("screenZoom").value/100})`; }
+  $("screenZoom").oninput = e => { $("screenZoomv").textContent = e.target.value + "%"; zoomUpdate(); };
+  ["couplingJ","edgeGamma","curvatureK"].forEach(id => { 
+      $(id).oninput = e => { 
+          // J 和 K 有小数位，所以用 toFixed 格式化一下
+          let val = Number(e.target.value);
+          $(id+"v").textContent = (id === "edgeGamma") ? val : val.toFixed(1); 
+      }; 
+  });
+
+  $("exportFull").onclick = () => {
+    if(!result) return;
+    
+    let counts = {}; result.cells.forEach(idx => counts[idx] = (counts[idx]||0)+1);
+    let finalUsed = Object.entries(counts).map(([idx, count]) => ({...FULL_PALETTE[idx], count})).sort((a,b)=>b.count-a.count);
+    
+    const boardW = result.w * CW;
+    const boardH = result.h * CW;
+    const legendWidth = 320;
+    const padding = 40;
+    
+    const outCV = document.createElement("canvas");
+    outCV.width = boardW + legendWidth + padding * 3;
+    outCV.height = Math.max(boardH + padding * 2, finalUsed.length * 28 + 140);
+    const ctx = outCV.getContext("2d");
+    
+    ctx.fillStyle = "#ffffff"; 
+    ctx.fillRect(0, 0, outCV.width, outCV.height);
+    ctx.drawImage(sheet, padding, padding);
+    
+    let startX = boardW + padding * 2;
+    let startY = padding + 20;
+    
+    ctx.fillStyle = "#111827"; ctx.font = "bold 24px sans-serif"; ctx.textAlign = "left";
+    ctx.fillText("拼豆图纸信息 (自动生成)", startX, startY);
+    
+    startY += 35; ctx.font = "bold 14px sans-serif"; ctx.fillStyle = "#6b7280";
+    ctx.fillText(`尺寸: ${result.w} × ${result.h} 格    颜色总计: ${finalUsed.length} 种`, startX, startY);
+    
+    startY += 30; ctx.strokeStyle = "#e5e7eb"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(startX + legendWidth, startY); ctx.stroke();
+    
+    startY += 25;
+    finalUsed.forEach(c => {
+        ctx.fillStyle = c.hex; ctx.fillRect(startX, startY - 14, 20, 20); ctx.strokeRect(startX, startY - 14, 20, 20);
+        
+        ctx.fillStyle = "#111827"; ctx.font = "bold 16px sans-serif";
+        ctx.fillText(c.symbol, startX + 35, startY + 3);
+        
+        ctx.font = "14px sans-serif";
+        ctx.fillText(`${c.code}  (${c.name})`, startX + 65, startY + 2);
+        
+        ctx.font = "bold 15px monospace"; ctx.textAlign = "right";
+        ctx.fillText(`${c.count} 颗`, startX + legendWidth, startY + 2);
+        ctx.textAlign = "left"; 
+        
+        startY += 28;
+    });
+
+    const a = document.createElement("a");
+    a.href = outCV.toDataURL("image/png"); 
+    a.download = "智能拼豆图纸_完整版.png"; 
+    a.click();
+  };
+})();
+</script>
+</body>
+</html>
