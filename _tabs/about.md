@@ -18,4 +18,4 @@ order: 4
 
 - [menopause](/misc/menopause.html)
 - [diabetes](/misc/diabetes.html)
-- [拼豆方案生成器](/misc/Perler.html)
+- [拼豆方案生成器](/misc/beadArt.html)
