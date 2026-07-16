@@ -19,3 +19,5 @@ order: 4
 - [menopause](/misc/menopause.html)
 - [diabetes](/misc/diabetes.html)
 - [拼豆方案生成器](/misc/beadArt.html)
+- [取色器](/misc/color_picker.html)
+- [图像校正 - perspective变换](/misc/perspective.html)

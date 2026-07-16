@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web 透视矫正工具 (带放大镜)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { text-align: center; margin-top: 0; font-size: 24px; color: #1a1a1a; }
+        p.desc { text-align: center; color: #666; margin-bottom: 20px; }
+        
+        .controls { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
+        button, label.btn { padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; background: #e4e6eb; color: #333; display: inline-block; }
+        button:hover, label.btn:hover { background: #d8dadf; }
+        .btn-primary { background: #006aff; color: white; }
+        .btn-primary:hover { background: #005ce6; }
+        .btn-success { background: #00a400; color: white; }
+        .btn-success:hover { background: #008f00; }
+        button:disabled { background: #cccccc; color: #666; cursor: not-allowed; }
+        
+        .workspace { display: flex; gap: 20px; justify-content: center; align-items: flex-start; flex-wrap: wrap; }
+        .panel { flex: 1; min-width: 300px; max-width: 500px; display: flex; flex-direction: column; align-items: center; }
+        .panel h3 { margin-top: 0; margin-bottom: 10px; font-size: 16px; }
+        
+        .canvas-wrapper { position: relative; background: #e9e9e9; border: 2px dashed #bbb; border-radius: 8px; overflow: hidden; width: 100%; height: 500px; display: flex; justify-content: center; align-items: center; cursor: crosshair; }
+        canvas { position: absolute; }
+        
+        #loading { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 1000; text-align: center; line-height: 100vh; font-size: 24px; font-weight: bold; color: #006aff; }
+
+        /* --- 放大镜样式 --- */
+        #magnifier {
+            position: fixed;
+            display: none; /* 默认隐藏 */
+            width: 140px;
+            height: 140px;
+            border: 3px solid #006aff;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            pointer-events: none; /* 穿透鼠标事件，不影响画板点击 */
+            z-index: 999;
+            overflow: hidden;
+        }
+        #mag-canvas {
+            /* 强制关闭平滑，展示最真实的硬边缘像素块 */
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📐 图像透视矫正工具 (像素级对焦)</h1>
+    <p class="desc">鼠标悬浮时自动显示高清像素放大镜，实现精准打点。</p>
+    
+    <div class="controls">
+        <label class="btn btn-primary">
+            📁 上传图片 <input type="file" id="upload" accept="image/*" style="display: none;">
+        </label>
+        <button id="btn-clear" onclick="clearPoints()">🗑 清空选点</button>
+        <button id="btn-process" class="btn-primary" onclick="processPerspective()" disabled>✅ 裁剪并拉平</button>
+        <button id="btn-download" class="btn-success" onclick="downloadResult()" disabled>📥 下载结果</button>
+    </div>
+
+    <div class="workspace">
+        <div class="panel">
+            <h3>1. 在原图上依次点击 4 个顶点</h3>
+            <div class="canvas-wrapper" id="source-wrapper">
+                <span id="hint-text">请先上传图片</span>
+                <canvas id="canvas-source"></canvas>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h3>2. 矫正结果</h3>
+            <div class="canvas-wrapper">
+                <canvas id="canvas-result"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 放大镜容器 -->
+<div id="magnifier">
+    <canvas id="mag-canvas" width="140" height="140"></canvas>
+</div>
+
+<div id="loading">正在进行极速矩阵运算与插值，请稍候...</div>
+
+<script>
+    const canvasSource = document.getElementById('canvas-source');
+    const ctxSource = canvasSource.getContext('2d');
+    const canvasResult = document.getElementById('canvas-result');
+    const ctxResult = canvasResult.getContext('2d');
+    const sourceWrapper = document.getElementById('source-wrapper');
+    const hintText = document.getElementById('hint-text');
+    
+    // 放大镜相关
+    const magnifier = document.getElementById('magnifier');
+    const magCanvas = document.getElementById('mag-canvas');
+    const magCtx = magCanvas.getContext('2d');
+    const magSize = 140; // 放大镜 UI 尺寸
+    const magZoom = 6;   // 放大倍率 (倍数越大，提取的原图像素区域越小，看的越细)
+    
+    let originalImage = null;   
+    let points = [];            
+    let displayScale = 1;       
+    let finalDataURL = null;    
+
+    // --- 1. 处理图片上传 ---
+    document.getElementById('upload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            originalImage = new Image();
+            originalImage.onload = function() {
+                hintText.style.display = 'none';
+                clearPoints();
+                renderSource();
+                ctxResult.clearRect(0, 0, canvasResult.width, canvasResult.height);
+                document.getElementById('btn-download').disabled = true;
+            };
+            originalImage.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function renderSource() {
+        if (!originalImage) return;
+        const maxDim = 500;
+        let w = originalImage.width, h = originalImage.height;
+        displayScale = Math.min(maxDim / w, maxDim / h);
+        
+        canvasSource.width = w * displayScale;
+        canvasSource.height = h * displayScale;
+        ctxSource.drawImage(originalImage, 0, 0, canvasSource.width, canvasSource.height);
+        drawMarkers();
+    }
+
+    // --- 2. 放大镜互动逻辑 ---
+    sourceWrapper.addEventListener('mousemove', function(e) {
+        if (!originalImage || points.length >= 4) {
+            magnifier.style.display = 'none';
+            return;
+        }
+
+        const rect = canvasSource.getBoundingClientRect();
+        const uiX = e.clientX - rect.left;
+        const uiY = e.clientY - rect.top;
+
+        // 如果鼠标不在 canvas 内，则隐藏
+        if (uiX < 0 || uiY < 0 || uiX > canvasSource.width || uiY > canvasSource.height) {
+            magnifier.style.display = 'none';
+            return;
+        }
+
+        magnifier.style.display = 'block';
+
+        // 智能定位放大镜，防止超出屏幕
+        let magLeft = e.clientX + 20;
+        let magTop = e.clientY + 20;
+        if (magLeft + magSize > window.innerWidth) magLeft = e.clientX - magSize - 20;
+        if (magTop + magSize > window.innerHeight) magTop = e.clientY - magSize - 20;
+        
+        magnifier.style.left = magLeft + 'px';
+        magnifier.style.top = magTop + 'px';
+
+        // 还原真实的原始图片坐标
+        const origX = uiX / displayScale;
+        const origY = uiY / displayScale;
+
+        // 需要从原图抠出的真实像素区域大小
+        const sourceSize = magSize / magZoom; 
+
+        // 清除旧画布
+        magCtx.clearRect(0, 0, magSize, magSize);
+        
+        // 【核心】从高清原图直接抓取画面，绘制到放大镜 Canvas
+        magCtx.drawImage(
+            originalImage, 
+            origX - sourceSize / 2, origY - sourceSize / 2, sourceSize, sourceSize, // 源图裁剪坐标
+            0, 0, magSize, magSize // 目标绘制坐标
+        );
+
+        // 绘制精准的十字准心
+        magCtx.lineWidth = 2;
+        magCtx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+        magCtx.beginPath();
+        magCtx.moveTo(magSize / 2, 0);
+        magCtx.lineTo(magSize / 2, magSize);
+        magCtx.moveTo(0, magSize / 2);
+        magCtx.lineTo(magSize, magSize / 2);
+        magCtx.stroke();
+    });
+
+    sourceWrapper.addEventListener('mouseout', () => {
+        magnifier.style.display = 'none';
+    });
+
+    // --- 3. 处理打点 ---
+    sourceWrapper.addEventListener('mousedown', function(e) {
+        if (!originalImage || points.length >= 4) return;
+        
+        const rect = canvasSource.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        if (x < 0 || y < 0 || x > canvasSource.width || y > canvasSource.height) return;
+
+        points.push({ x: x, y: y });
+        
+        if (points.length === 4) {
+            sortPoints();
+            document.getElementById('btn-process').disabled = false;
+            magnifier.style.display = 'none'; // 打满 4 点后隐藏放大镜
+        }
+        
+        renderSource();
+    });
+
+    function clearPoints() {
+        points = [];
+        document.getElementById('btn-process').disabled = true;
+        renderSource();
+    }
+
+    function sortPoints() {
+        points.sort((a, b) => a.y - b.y);
+        let top = points.slice(0, 2).sort((a, b) => a.x - b.x); 
+        let bottom = points.slice(2, 4).sort((a, b) => b.x - a.x); 
+        points = [top[0], top[1], bottom[0], bottom[1]];
+    }
+
+    function drawMarkers() {
+        ctxSource.lineWidth = 2;
+        ctxSource.strokeStyle = '#00ff00';
+        
+        if (points.length === 4) {
+            ctxSource.beginPath();
+            ctxSource.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < 4; i++) ctxSource.lineTo(points[i].x, points[i].y);
+            ctxSource.closePath();
+            ctxSource.stroke();
+            ctxSource.fillStyle = 'rgba(0, 255, 0, 0.2)';
+            ctxSource.fill();
+        }
+        
+        points.forEach((p, index) => {
+            ctxSource.beginPath();
+            ctxSource.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+            ctxSource.fillStyle = 'red';
+            ctxSource.fill();
+            ctxSource.strokeStyle = 'white';
+            ctxSource.stroke();
+            
+            ctxSource.fillStyle = 'yellow';
+            ctxSource.font = '14px Arial';
+            ctxSource.fillText(index + 1, p.x + 8, p.y - 8);
+        });
+    }
+
+    // --- 4. 矩阵运算与透视插值 ---
+    function processPerspective() {
+        if (points.length !== 4) return;
+        document.getElementById('loading').style.display = 'block';
+        setTimeout(() => {
+            executeMath();
+            document.getElementById('loading').style.display = 'none';
+        }, 50);
+    }
+
+    function executeMath() {
+        const srcPts = points.map(p => ({ x: p.x / displayScale, y: p.y / displayScale }));
+        const [p0, p1, p2, p3] = srcPts;
+
+        const dstW = Math.max(
+            Math.round(Math.hypot(p1.x - p0.x, p1.y - p0.y)),
+            Math.round(Math.hypot(p2.x - p3.x, p2.y - p3.y))
+        );
+        const dstH = Math.max(
+            Math.round(Math.hypot(p3.x - p0.x, p3.y - p0.y)),
+            Math.round(Math.hypot(p2.x - p1.x, p2.y - p1.y))
+        );
+
+        const dx1 = p1.x - p2.x, dy1 = p1.y - p2.y;
+        const dx2 = p3.x - p2.x, dy2 = p3.y - p2.y;
+        const sx = p0.x - p1.x + p2.x - p3.x, sy = p0.y - p1.y + p2.y - p3.y;
+
+        const det = (dx1 * dy2) - (dx2 * dy1);
+        let g = 0, h = 0;
+        if (det !== 0) {
+            g = ((sx * dy2) - (dx2 * sy)) / det;
+            h = ((dx1 * sy) - (sx * dy1)) / det;
+        }
+
+        const a = p1.x - p0.x + g * p1.x, b = p3.x - p0.x + h * p3.x, c = p0.x;
+        const d = p1.y - p0.y + g * p1.y, e = p3.y - p0.y + h * p3.y, f = p0.y;
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = originalImage.width; tempCanvas.height = originalImage.height;
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+        tempCtx.drawImage(originalImage, 0, 0);
+        const srcData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const srcPixels = srcData.data, srcW = srcData.width, srcH = srcData.height;
+
+        const dstData = new ImageData(dstW, dstH);
+        const dstPixels = dstData.data;
+
+        for (let y = 0; y < dstH; y++) {
+            let v = y / (dstH - 1 || 1);
+            for (let x = 0; x < dstW; x++) {
+                let u = x / (dstW - 1 || 1);
+                let denom = g * u + h * v + 1;
+                let srcX = (a * u + b * v + c) / denom;
+                let srcY = (d * u + e * v + f) / denom;
+
+                let dstIdx = (y * dstW + x) * 4;
+
+                if (srcX >= 0 && srcX < srcW - 1 && srcY >= 0 && srcY < srcH - 1) {
+                    let xf = Math.floor(srcX), yf = Math.floor(srcY);
+                    let wx = srcX - xf, wy = srcY - yf;
+                    let idxTL = (yf * srcW + xf) * 4, idxTR = idxTL + 4;
+                    let idxBL = ((yf + 1) * srcW + xf) * 4, idxBR = idxBL + 4;
+
+                    for (let c = 0; c < 4; c++) {
+                        let top = srcPixels[idxTL + c] * (1 - wx) + srcPixels[idxTR + c] * wx;
+                        let bot = srcPixels[idxBL + c] * (1 - wx) + srcPixels[idxBR + c] * wx;
+                        dstPixels[dstIdx + c] = top * (1 - wy) + bot * wy;
+                    }
+                } else {
+                    dstPixels[dstIdx+3] = 0; // 超出边界设为透明
+                }
+            }
+        }
+
+        const outCanvas = document.createElement('canvas');
+        outCanvas.width = dstW; outCanvas.height = dstH;
+        outCanvas.getContext('2d').putImageData(dstData, 0, 0);
+        finalDataURL = outCanvas.toDataURL('image/png', 1.0);
+
+        let outScale = Math.min(500 / dstW, 500 / dstH);
+        canvasResult.width = dstW * outScale; canvasResult.height = dstH * outScale;
+        ctxResult.drawImage(outCanvas, 0, 0, canvasResult.width, canvasResult.height);
+        document.getElementById('btn-download').disabled = false;
+    }
+
+    function downloadResult() {
+        if (!finalDataURL) return;
+        const link = document.createElement('a');
+        link.download = 'perspective_corrected.png';
+        link.href = finalDataURL;
+        link.click();
+    }
+</script>
+</body>
+</html>
