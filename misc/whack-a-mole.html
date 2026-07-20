@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双人打地鼠</title>
+    <style>
+        * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; }
+        body { background-color: #2c3e50; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; }
+        
+        #game-container { position: relative; width: 800px; height: 600px; background: #27ae60; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 0 100px rgba(0,0,0,0.3); border: 15px solid #1e8449; }
+        canvas { display: block; width: 100%; height: 100%; border-radius: 5px; }
+
+        /* UI 面板 */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.85); border-radius: 5px; z-index: 10; backdrop-filter: blur(4px); }
+        .title { color: #f1c40f; font-size: 48px; margin-bottom: 15px; text-shadow: 0 5px 15px rgba(0,0,0,0.8); }
+        .instructions { background: #fff; color: #333; padding: 25px; border-radius: 15px; font-size: 16px; line-height: 1.6; margin-bottom: 20px; text-align: left; max-width: 80%; }
+        .instructions h3 { margin-top: 0; text-align: center; color: #e74c3c; font-size: 22px; margin-bottom: 10px; }
+        .key { display: inline-block; padding: 2px 8px; background: #34495e; color: white; border-radius: 5px; font-weight: bold; margin: 0 2px; }
+        
+        /* 上传控件区域 */
+        .upload-area { display: flex; gap: 20px; margin-bottom: 20px; }
+        .upload-btn { position: relative; overflow: hidden; background: #9b59b6; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; text-align: center; border: 2px solid #8e44ad; }
+        .upload-btn:hover { background: #8e44ad; }
+        .upload-btn input[type="file"] { position: absolute; top: 0; left: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+        
+        .btn { padding: 15px 50px; font-size: 26px; font-weight: bold; background: #3498db; color: white; border: none; border-radius: 10px; cursor: pointer; transition: 0.2s; box-shadow: 0 5px 0 #2980b9; }
+        .btn:hover { transform: translateY(2px); box-shadow: 0 3px 0 #2980b9; }
+        .btn:active { transform: translateY(5px); box-shadow: 0 0 0 #2980b9; }
+
+        /* 顶部计分板 */
+        #hud { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 90%; display: flex; justify-content: space-between; pointer-events: none; }
+        .score-box { background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 15px; font-size: 24px; font-weight: bold; color: white; border: 2px solid rgba(255,255,255,0.2); }
+        #p1-score { color: #f1c40f; }
+        #p2-score { color: #e74c3c; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div id="hud">
+            <div class="score-box">🦫 地鼠(P1): <span id="p1-score">0</span>/<span class="ui-win-score">100</span></div>
+            <div class="score-box">🔨 猎人(P2): <span id="p2-score">0</span>/<span class="ui-win-score">100</span></div>
+        </div>
+
+        <div id="ui-layer">
+            <div class="title" id="main-title">双人打地鼠</div>
+            
+            <div class="upload-area">
+                <label class="upload-btn" id="lbl-mole">
+                    上传地鼠头像
+                    <input type="file" id="upload-mole" accept="image/*">
+                </label>
+                <label class="upload-btn" id="lbl-hammer">
+                    上传锤子贴纸
+                    <input type="file" id="upload-hammer" accept="image/*">
+                </label>
+            </div>
+
+            <div class="instructions" id="instructions">
+                <h3>🎮 游戏规则 🎮</h3>
+                <p><b>🦫 地鼠(P1)：</b>按 <span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span class="key">D</span> 探头。<br>👉 <i>探头1/3停留 <b id="ui-mole-delay">0.4秒</b>后 完全探头并加分，被砸眩晕 <span id="ui-mole-stun">1</span> 秒。</i></p>
+                <hr style="margin: 10px 0; border-top: 1px dashed #ccc;">
+                <p><b>🔨 猎人(P2)：</b>按 <span class="key">↑</span> <span class="key">←</span> <span class="key">↓</span> <span class="key">→</span> 挥锤。<br>👉 <i>砸下前摇需要 <b id="ui-hammer-swing">0.6秒</b>，到底瞬间才产生判定！砸中加 <span id="ui-hammer-score">5</span> 分。</i></p>
+            </div>
+            <button class="btn" id="start-btn">开始游戏</button>
+        </div>
+    </div>
+
+    <script>
+        /** ==========================================
+         *  ⚙️ 游戏超参数配置 (开发者调试专用区域)
+         *  修改下方数值会自动同步到游戏逻辑和UI规则说明中
+         *  ========================================== */
+        const GAME_CONFIG = {
+            // 全局设置
+            winScore: 100,               // 获胜所需分数
+
+            // 🦫 地鼠(P1) 相关参数
+            moleSpeed: 500,              // 探头/缩回基础速度
+            moleStunRetractMult: 2,      // 被砸晕后缩回速度的倍率 (相对于基础速度)
+            moleReadyDelay: 0.4,         // 探头1/3时，延迟多久(秒)后才完全探出并开始加分
+            molePartialOffset: 66,       // 探头1/3时的 yOffset 值 (100为完全缩回，0为完全探出)
+            moleScoreInterval: 0.2,      // 开始加分后，每次加分的间隔时间(秒)
+            moleScorePerTick: 1,         // 每次间隔加多少分
+            moleStunDuration: 1.2,       // 被砸中后的眩晕时间(秒)
+            moleHitboxOffset: 80,        // 判定区域高度: yOffset 小于该值(即探出足够高)才算被打中
+
+            // 🔨 猎人(P2) 锤子相关参数
+            hammerSwingTime: 0.38,        // 砸下前摇时间(秒)
+            hammerRecoverTime: 0.3,      // 砸到底后拔起的恢复时间(秒)
+            hammerScorePerHit: 5,        // 成功砸中一次加多少分
+            hammerStartAngle: Math.PI/4, // 锤子初始/待机角度
+            hammerEndAngle: -0.2         // 锤子砸底时的角度
+        };
+
+        // 自动将配置同步更新到 UI 文本（保持界面和参数一致）
+        document.querySelectorAll('.ui-win-score').forEach(el => el.innerText = GAME_CONFIG.winScore);
+        document.getElementById('ui-mole-delay').innerText = GAME_CONFIG.moleReadyDelay + "秒";
+        document.getElementById('ui-mole-stun').innerText = GAME_CONFIG.moleStunDuration;
+        document.getElementById('ui-hammer-swing').innerText = GAME_CONFIG.hammerSwingTime + "秒";
+        document.getElementById('ui-hammer-score').innerText = GAME_CONFIG.hammerScorePerHit;
+        /** ========================================== */
+
+
+        /** --- 自定义图片加载 --- */
+        let customMoleImg = null;
+        let customHammerImg = null;
+
+        function handleUpload(inputId, labelId, callback) {
+            document.getElementById(inputId).addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const img = new Image();
+                        img.onload = () => {
+                            callback(img);
+                            document.getElementById(labelId).innerText = "已加载 ✅";
+                            document.getElementById(labelId).style.background = "#27ae60";
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+        handleUpload('upload-mole', 'lbl-mole', img => customMoleImg = img);
+        handleUpload('upload-hammer', 'lbl-hammer', img => customHammerImg = img);
+
+        /** --- Web Audio API 音效引擎 --- */
+        const AudioSys = {
+            ctx: null,
+            init() { if (!this.ctx) { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } if (this.ctx.state === 'suspended') this.ctx.resume(); },
+            playTone(type, f1, f2, dur, vol) {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = type; osc.frequency.setValueAtTime(f1, this.ctx.currentTime);
+                if (f2) osc.frequency.exponentialRampToValueAtTime(f2, this.ctx.currentTime + dur);
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + dur);
+            },
+            swing() { this.playTone('sine', 200, 80, GAME_CONFIG.hammerSwingTime, 0.5); }, 
+            hit() { this.playTone('square', 300, 50, 0.15, 0.7); this.playTone('triangle', 600, 200, 0.1, 0.5); },
+            score() { this.playTone('sine', 800, 850, 0.05, 0.1); },
+            stun() { this.playTone('sawtooth', 200, 50, 0.3, 0.2); }
+        };
+
+        /** --- Canvas 游戏核心 --- */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const p1ScoreEl = document.getElementById('p1-score');
+        const p2ScoreEl = document.getElementById('p2-score');
+
+        const holes = [
+            { x: 400, y: 180, keyMap: { mole: 'w', hammer: 'arrowup' } },
+            { x: 200, y: 350, keyMap: { mole: 'a', hammer: 'arrowleft' } },
+            { x: 600, y: 350, keyMap: { mole: 'd', hammer: 'arrowright' } },
+            { x: 400, y: 500, keyMap: { mole: 's', hammer: 'arrowdown' } }
+        ];
+
+        let gameState = 'MENU';
+        let lastTime = 0;
+        let p1Score = 0, p2Score = 0;
+        let particles = [];
+
+        const mole = {
+            activeIdx: -1,
+            yOffset: 100,
+            state: 'HIDDEN',
+            stunTimer: 0,
+            scoreTimer: 0,
+            readyTimer: 0 
+        };
+
+        const hammer = {
+            activeIdx: -1,
+            angle: GAME_CONFIG.hammerStartAngle,
+            state: 'IDLE',
+            hasHit: false
+        };
+
+        const keysDown = {};
+        window.addEventListener('keydown', e => {
+            const k = e.key.toLowerCase();
+            if (['arrowup','arrowdown','arrowleft','arrowright'].includes(k)) e.preventDefault();
+            keysDown[k] = true;
+            handleInput();
+        });
+        window.addEventListener('keyup', e => {
+            keysDown[e.key.toLowerCase()] = false;
+            handleInput();
+        });
+
+        function handleInput() {
+            if (gameState !== 'PLAYING') return;
+
+            // 地鼠逻辑
+            if (mole.state !== 'STUNNED') {
+                let wantIdx = -1;
+                for (let i = 0; i < holes.length; i++) {
+                    if (keysDown[holes[i].keyMap.mole]) { wantIdx = i; break; }
+                }
+
+                if (wantIdx !== -1) {
+                    if (mole.state === 'HIDDEN' || mole.state === 'FALLING') {
+                        mole.activeIdx = wantIdx;
+                        mole.state = 'RISING';
+                    } else if (mole.activeIdx !== wantIdx) {
+                        mole.state = 'FALLING';
+                    }
+                } else {
+                    // 当松开按键时，无论处于升起的哪个阶段，都进入下降状态
+                    if (['RISING', 'DELAY', 'RISING_FULL', 'UP'].includes(mole.state)) {
+                        mole.state = 'FALLING';
+                    }
+                }
+            }
+
+            // 锤子逻辑 (开启前摇)
+            if (hammer.state === 'IDLE') {
+                for (let i = 0; i < holes.length; i++) {
+                    if (keysDown[holes[i].keyMap.hammer]) {
+                        hammer.activeIdx = i;
+                        hammer.state = 'SWING_DOWN';
+                        hammer.angle = GAME_CONFIG.hammerStartAngle;
+                        hammer.hasHit = false;
+                        AudioSys.swing();
+                        break; 
+                    }
+                }
+            }
+        }
+
+        function startGame() {
+            AudioSys.init();
+            p1Score = 0; p2Score = 0;
+            updateHUD();
+            document.getElementById('ui-layer').style.display = 'none';
+            mole.state = 'HIDDEN'; mole.activeIdx = -1; mole.yOffset = 100;
+            hammer.state = 'IDLE'; hammer.activeIdx = -1;
+            particles = [];
+            gameState = 'PLAYING';
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+        document.getElementById('start-btn').addEventListener('click', startGame);
+
+        function updateHUD() {
+            p1ScoreEl.innerText = Math.floor(p1Score);
+            p2ScoreEl.innerText = p2Score;
+            if (p1Score >= GAME_CONFIG.winScore) endGame("🦫 地鼠 (P1)");
+            else if (p2Score >= GAME_CONFIG.winScore) endGame("🔨 锤子 (P2)");
+        }
+
+        function endGame(winner) {
+            gameState = 'GAMEOVER';
+            document.getElementById('main-title').innerText = `${winner} 获胜！`;
+            document.getElementById('start-btn').innerText = "再玩一次";
+            document.getElementById('ui-layer').style.display = 'flex';
+        }
+
+        function addParticle(x, y, text, color) {
+            particles.push({ x, y, text, color, life: 1.0, dy: -50 });
+        }
+
+        /** --- 主更新逻辑 --- */
+        function update(dt) {
+            const moleSpeed = GAME_CONFIG.moleSpeed; 
+
+            // --- 地鼠状态机 ---
+            if (mole.state === 'RISING') {
+                // 阶段1：升到 1/3 高度
+                mole.yOffset -= moleSpeed * dt;
+                if (mole.yOffset <= GAME_CONFIG.molePartialOffset) {
+                    mole.yOffset = GAME_CONFIG.molePartialOffset;
+                    mole.state = 'DELAY';
+                    mole.readyTimer = GAME_CONFIG.moleReadyDelay; 
+                }
+            } else if (mole.state === 'DELAY') {
+                // 阶段2：在 1/3 高度处停留等待
+                mole.readyTimer -= dt;
+                if (mole.readyTimer <= 0) {
+                    mole.state = 'RISING_FULL';
+                }
+            } else if (mole.state === 'RISING_FULL') {
+                // 阶段3：延迟结束，完全探头
+                mole.yOffset -= moleSpeed * dt;
+                if (mole.yOffset <= 0) {
+                    mole.yOffset = 0;
+                    mole.state = 'UP';
+                    mole.scoreTimer = 0; // 准备开始加分
+                }
+            } else if (mole.state === 'FALLING') {
+                // 回缩
+                mole.yOffset += moleSpeed * dt;
+                if (mole.yOffset >= 100) {
+                    mole.yOffset = 100; mole.state = 'HIDDEN'; mole.activeIdx = -1;
+                    handleInput(); 
+                }
+            } else if (mole.state === 'UP') {
+                // 阶段4：持续加分
+                mole.scoreTimer += dt;
+                if (mole.scoreTimer >= GAME_CONFIG.moleScoreInterval) { 
+                    p1Score += GAME_CONFIG.moleScorePerTick;
+                    mole.scoreTimer = 0;
+                    AudioSys.score();
+                    updateHUD();
+                    
+                    // 添加地鼠的 +1 粒子特效 (带一点随机X轴偏移让连续加分字体重叠得更好看)
+                    const h = holes[mole.activeIdx];
+                    const jitterX = (Math.random() - 0.5) * 20; 
+                    addParticle(h.x - 30 + jitterX, h.y - 60, "+" + GAME_CONFIG.moleScorePerTick, "#f1c40f");
+                }
+            } else if (mole.state === 'STUNNED') {
+                // 被砸晕
+                mole.stunTimer -= dt;
+                if (mole.yOffset < 100) mole.yOffset += (moleSpeed * GAME_CONFIG.moleStunRetractMult) * dt; 
+                if (mole.yOffset > 100) mole.yOffset = 100;
+                if (mole.stunTimer <= 0) {
+                    mole.state = 'HIDDEN'; mole.activeIdx = -1;
+                    handleInput();
+                }
+            }
+
+            // --- 锤子状态机 ---
+            if (hammer.state === 'SWING_DOWN') {
+                const totalAngle = GAME_CONFIG.hammerStartAngle - GAME_CONFIG.hammerEndAngle;
+                // 匀速下砸
+                hammer.angle -= (totalAngle / GAME_CONFIG.hammerSwingTime) * dt; 
+                if (hammer.angle <= GAME_CONFIG.hammerEndAngle) { 
+                    hammer.angle = GAME_CONFIG.hammerEndAngle;
+                    hammer.state = 'RECOVER';
+                    checkCollision();
+                }
+            } else if (hammer.state === 'RECOVER') {
+                // 快速拔起
+                const totalAngle = GAME_CONFIG.hammerStartAngle - GAME_CONFIG.hammerEndAngle;
+                hammer.angle += (totalAngle / GAME_CONFIG.hammerRecoverTime) * dt;
+                if (hammer.angle >= GAME_CONFIG.hammerStartAngle) {
+                    hammer.angle = GAME_CONFIG.hammerStartAngle;
+                    hammer.state = 'IDLE'; hammer.activeIdx = -1;
+                    handleInput(); 
+                }
+            }
+
+            // 粒子特效更新
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.life -= dt * 1.5; p.y += p.dy * dt;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        // 碰撞判定
+        function checkCollision() {
+            if (hammer.hasHit) return;
+            // 砸下的洞必须和地鼠一致，地鼠未眩晕，且探头高度达到了暴露阈值 (yOffset < 80)
+            // 注意：因为 1/3 停留时的 yOffset 是 66，66 < 80，所以地鼠在停留等待期间也能被打中！这符合游戏设计初衷。
+            if (hammer.activeIdx === mole.activeIdx && mole.state !== 'STUNNED' && mole.yOffset < GAME_CONFIG.moleHitboxOffset) {
+                hammer.hasHit = true;
+                p2Score += GAME_CONFIG.hammerScorePerHit; 
+                updateHUD();
+                
+                AudioSys.hit();
+                AudioSys.stun();
+                
+                const hx = holes[mole.activeIdx].x;
+                const hy = holes[mole.activeIdx].y;
+                addParticle(hx + 20, hy - 40, "+" + GAME_CONFIG.hammerScorePerHit, "#e74c3c"); 
+                
+                mole.state = 'STUNNED';
+                mole.stunTimer = GAME_CONFIG.moleStunDuration; 
+            }
+        }
+
+        /** --- 绘图逻辑 --- */
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '16px monospace'; ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.textAlign = 'center';
+
+            holes.forEach((h) => {
+                // 洞
+                ctx.fillStyle = '#0a0a0a'; ctx.beginPath(); ctx.ellipse(h.x, h.y + 10, 60, 25, 0, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#1b4f32'; ctx.lineWidth = 5; ctx.stroke();
+                // 键位提示
+                ctx.fillText(`[${h.keyMap.mole.toUpperCase()}]`, h.x - 60, h.y + 15);
+                ctx.fillText(`[${h.keyMap.hammer.replace('arrow', '').toUpperCase()}]`, h.x + 60, h.y + 15);
+            });
+
+            // 画地鼠
+            if (mole.activeIdx !== -1) {
+                const h = holes[mole.activeIdx];
+                const my = h.y + mole.yOffset;
+                
+                ctx.save();
+                ctx.beginPath(); ctx.rect(h.x - 60, h.y - 100, 120, 110); ctx.clip(); // 遮罩
+
+                // 身体背景
+                ctx.fillStyle = mole.state === 'STUNNED' ? '#c0392b' : '#d35400';
+                ctx.beginPath(); ctx.roundRect(h.x - 40, my - 80, 80, 100, 40); ctx.fill();
+
+                if (customMoleImg && mole.state !== 'STUNNED') {
+                    // 自定义头像（裁剪为圆形贴在脸上）
+                    ctx.save();
+                    ctx.beginPath(); ctx.arc(h.x, my - 45, 30, 0, Math.PI * 2); ctx.clip();
+                    ctx.drawImage(customMoleImg, h.x - 30, my - 75, 60, 60);
+                    ctx.restore();
+                } else {
+                    // 默认五官
+                    if (mole.state === 'STUNNED') {
+                        ctx.strokeStyle = 'white'; ctx.lineWidth = 3;
+                        ctx.beginPath(); ctx.moveTo(h.x-20, my-60); ctx.lineTo(h.x-10, my-50); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(h.x-10, my-60); ctx.lineTo(h.x-20, my-50); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(h.x+10, my-60); ctx.lineTo(h.x+20, my-50); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(h.x+20, my-60); ctx.lineTo(h.x+10, my-50); ctx.stroke();
+                    } else {
+                        ctx.fillStyle = 'black';
+                        ctx.beginPath(); ctx.arc(h.x-15, my-55, 6, 0, Math.PI*2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(h.x+15, my-55, 6, 0, Math.PI*2); ctx.fill();
+                    }
+                    ctx.fillStyle = '#ffb8b8'; ctx.beginPath(); ctx.ellipse(h.x, my-40, 10, 6, 0, 0, Math.PI*2); ctx.fill(); // 鼻子
+                }
+                ctx.restore();
+            }
+
+            // 画锤子
+            if (hammer.activeIdx !== -1) {
+                const h = holes[hammer.activeIdx];
+                ctx.save();
+                ctx.translate(h.x + 50, h.y);
+                ctx.rotate(hammer.angle);
+                
+                // 柄
+                ctx.fillStyle = '#8e44ad'; ctx.fillRect(-10, -80, 20, 100);
+                // 头
+                ctx.fillStyle = '#95a5a6'; ctx.beginPath(); ctx.roundRect(-40, -110, 80, 50, 10); ctx.fill();
+                ctx.strokeStyle = '#2c3e50'; ctx.lineWidth=2; ctx.stroke();
+                // 侧面打击区
+                ctx.fillStyle = '#bdc3c7'; ctx.fillRect(-40, -100, 10, 30);
+
+                // 自定义锤子贴花 (贴在侧边)
+                if (customHammerImg) {
+                    ctx.save();
+                    ctx.beginPath(); ctx.roundRect(-25, -105, 40, 40, 5); ctx.clip();
+                    ctx.drawImage(customHammerImg, -25, -105, 40, 40);
+                    ctx.restore();
+                }
+
+                ctx.restore();
+            }
+
+            // 漂浮特效
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.font = 'bold 36px Arial';
+                ctx.shadowColor = 'black'; ctx.shadowBlur = 4;
+                ctx.fillText(p.text, p.x, p.y);
+                ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
+            });
+        }
+
+        function gameLoop(timestamp) {
+            if (gameState !== 'PLAYING') return;
+            let dt = (timestamp - lastTime) / 1000;
+            if (dt > 0.1) dt = 0.1; 
+            lastTime = timestamp;
+            update(dt); draw();
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
