@@ -1,7 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
     <title>SVG 组图排版工具</title>
     <style>
         :root {
@@ -12,7 +11,7 @@
         
         /* 侧边栏 */
         .sidebar {
-            width: 300px; background: var(--panel-bg); border-right: 1px solid var(--border-color);
+            width: 320px; background: var(--panel-bg); border-right: 1px solid var(--border-color);
             padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px;
             box-shadow: 2px 0 8px rgba(0,0,0,0.05); z-index: 10; overflow-y: auto;
         }
@@ -45,7 +44,7 @@
         }
 
         /* SVG 容器 */
-        .svg-wrapper { position: absolute; border: 1px dashed transparent; box-sizing: border-box; cursor: move; min-width: 50px; min-height: 50px; }
+        .svg-wrapper { position: absolute; border: 1px dashed transparent; box-sizing: border-box; cursor: move; min-width: 50px; min-height: 50px; z-index: 10; }
         .svg-wrapper:hover, .svg-wrapper.active { border-color: var(--primary-color); }
         .svg-wrapper svg { width: 100%; height: 100%; display: block; pointer-events: none; }
         
@@ -60,6 +59,19 @@
         .edge-handle.edge-b { bottom: -3px; left: 3px; right: 3px; height: 6px; cursor: s-resize; }
         .edge-handle.edge-l { left: -3px; top: 3px; bottom: 3px; width: 6px; cursor: w-resize; }
         .edge-handle.edge-r { right: -3px; top: 3px; bottom: 3px; width: 6px; cursor: e-resize; }
+
+        /* 组图排版网格图层 */
+        .grid-layout-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 1; }
+        .grid-cell { position: absolute; border: 1.5px dashed #aaa; box-sizing: border-box; background: rgba(255, 255, 255, 0.4); pointer-events: auto; cursor: default; transition: background 0.15s; }
+        .grid-cell:hover { background: rgba(24, 144, 255, 0.05); }
+        .grid-cell.selected { border: 2.5px solid var(--primary-color); background: rgba(24, 144, 255, 0.12); }
+        .grid-cell-label { position: absolute; top: 6px; left: 10px; font-family: Arial, sans-serif; font-weight: bold; color: #333; user-select: none; pointer-events: none; z-index: 2; }
+        
+        /* 网格线宽度调节手柄 */
+        .grid-resizer { position: absolute; background: transparent; pointer-events: auto; z-index: 5; }
+        .grid-resizer:hover { background: var(--primary-color); }
+        .grid-resizer.v-resizer { width: 8px; cursor: col-resize; }
+        .grid-resizer.h-resizer { height: 8px; cursor: row-resize; }
 
         /* 框选虚线框 */
         .selection-box { position: absolute; border: 1px dashed var(--primary-color); background: rgba(24, 144, 255, 0.15); pointer-events: none; z-index: 9999; }
@@ -112,37 +124,79 @@
 <body>
 
     <div class="sidebar">
-        <h2 style="margin-bottom: 0;">SVG 组图工具</h2>
-        <p style="font-size:12px; color:#666; margin-top:5px;">💡 在画布空白处拖拽鼠标可框选图内多个文本框。</p>
-        <p style="font-size:12px; color:#666; margin-top:5px;">💡 双击单图可以修改颜色和文本内容。</p>
-        <p style="font-size:12px; color:#666; margin-top:5px;">💡 单图可以调整边界大小（上下左右）和整体缩放（右下角）</p>
+        <h2 style="margin-bottom: 0; font-size: 18px;">SVG 矢量及图片组图排版</h2>
+        <p style="font-size:12px; color:#666; margin-top:5px; line-height: 1.4;">
+            💡 <b>修改颜色和文本</b>：双击导入的小图，可以批量修改字体大小和颜色。也可以逐个修改文本内容和格式。<br>
+            💡 <b>框选与标注</b>：在画布或网格空白处拖拽，可框选批量修改字号。点击网格单元可编辑角标。
+        </p>
         
         <div class="section-title">1. 画布设置</div>
         <div class="row">
             <label>宽(mm):</label> <input type="number" id="canvas-w" value="380">
             <label>高(mm):</label> <input type="number" id="canvas-h" value="220">
         </div>
-        <div class="row"><label><input type="checkbox" id="toggle-grid" checked> 显示网格</label></div>
+        <div class="row"><label><input type="checkbox" id="toggle-grid" checked=""> 显示网格背景</label></div>
         <div class="row"><label><input type="checkbox" id="toggle-ruler"> 显示标尺</label></div>
         <div class="row"><label><input type="checkbox" id="toggle-snap"> 拖拽时吸附网格</label></div>
-        <div class="row"><label><input type="checkbox" id="force-arial" checked> 全部使用 Arial 字体</label></div>
+        <div class="row"><label><input type="checkbox" id="force-arial" checked=""> 全部使用 Arial 字体</label></div>
 
-        <div class="section-title">2. 导入图形</div>
-        <label for="file-upload" class="btn">添加 SVG 文件</label>
-        <input type="file" id="file-upload" accept=".svg" multiple>
+        <div class="section-title">2. 导入图形 (支持 SVG / PNG / JPG)</div>
+        <label for="file-upload" class="btn">添加矢量或图片文件</label>
+        <input type="file" id="file-upload" accept=".svg,.png,.jpg,.jpeg" multiple="">
+
+        <div class="section-title">3. 分区网格与自动对齐</div>
+        <div class="row">
+            <label>行数(m):</label> <input type="number" id="grid-rows" value="2" min="1" max="10">
+            <label>列数(n):</label> <input type="number" id="grid-cols" value="2" min="1" max="10">
+        </div>
+        <div class="row" style="margin-top: 5px;">
+            <button class="btn" style="background:#722ed1;" onclick="createLayoutGrid()">生成排版网格</button>
+        </div>
+        <div class="row" style="gap: 5px; margin-top: 2px;">
+            <button class="btn" style="background:#13c2c2; flex:1; font-size:12px; padding:6px;" onclick="mergeSelectedCells()">合并选中格</button>
+            <button class="btn" style="background:#eb2f96; flex:1; font-size:12px; padding:6px;" onclick="splitSelectedCells()">拆分单元格</button>
+        </div>
+        <div class="row" style="margin-top: 5px;">
+            <label>标注样式:</label>
+            <select id="grid-label-style" onchange="updateCellLabels(); renderGridLayout();" style="padding:4px; border-radius:4px; border:1px solid #ccc; flex:1;">
+                <option value="uppercase">A, B, C...</option>
+                <option value="lowercase">a, b, c...</option>
+                <option value="none">不添加标注</option>
+            </select>
+        </div>
+        <div class="row">
+            <label>标注大小(px):</label> <input type="number" id="grid-label-size" value="24" style="width:60px;">
+        </div>
+        <div class="row">
+            <label>对齐边距(px):</label> <input type="number" id="grid-align-padding" value="2" min="0" max="100" style="width:60px;">
+        </div>
+        <div class="row" style="margin-top: 5px; flex-direction:column; gap:5px;">
+            <button class="btn" style="background:#2f54eb; padding:8px;" onclick="alignSelectedToCell()">对齐选中图到选中网格</button>
+            <button class="btn" style="background:#faad14; padding:8px; color: #111; font-weight: bold;" onclick="distributeAllToGrid()">一键自动填充排版</button>
+        </div>
+
+        <div class="section-title">4. 工程管理 (暂存与读取)</div>
+        <div class="row" style="gap: 5px;">
+            <button class="btn" style="background:#52c41a; flex:1;" onclick="exportProject()">保存工程 (.json)</button>
+            <button class="btn" style="background:#13c2c2; flex:1;" onclick="document.getElementById('project-upload').click()">载入工程</button>
+        </div>
+        <input type="file" id="project-upload" accept=".json" style="display:none;" onchange="importProject(this.files[0])">
 
         <div style="flex-grow: 1;"></div>
         
-        <div class="section-title">3. 导出结果</div>
-        <button class="btn btn-export" id="btn-export-combined">导出总图</button>
-        <button class="btn btn-export-batch" id="btn-export-batch">批量导出小图</button>
+        <div class="section-title">5. 导出排版结果</div>
+        <button class="btn btn-export" id="btn-export-combined">导出无损矢量总图</button>
+        <button class="btn btn-export-batch" id="btn-export-batch">批量导出修改后的小图</button>
     </div>
 
     <div class="main-area">
         <div class="canvas-container" id="canvas-container">
             <div class="ruler ruler-h"></div>
             <div class="ruler ruler-v"></div>
-            <div class="canvas show-grid force-arial" id="canvas"></div>
+            <div class="canvas show-grid force-arial" id="canvas">
+                <!-- 排版网格层 -->
+                <div class="grid-layout-layer" id="grid-layout-layer"></div>
+            </div>
         </div>
     </div>
 
@@ -186,8 +240,35 @@
         let activeEditWrapper = null;
         let selectedTextNodes = []; // 存储框选到的文本元素
 
-        document.getElementById('canvas-w').addEventListener('input', e => canvas.style.width = e.target.value + 'mm');
-        document.getElementById('canvas-h').addEventListener('input', e => canvas.style.height = e.target.value + 'mm');
+        // 分区网格状态管理
+        let layoutGrid = {
+            rows: 2,
+            cols: 2,
+            rowSizes: [], // 存储百分比
+            colSizes: [], // 存储百分比
+            cells: []     // { r, c, rSpan, cSpan, label, selected }
+        };
+
+        // ================= 0. 底层工具 =================
+        function colorToHex(colorStr) {
+            if (!colorStr || colorStr === 'none' || colorStr === 'transparent') return null;
+            try {
+                const ctx = document.createElement('canvas').getContext('2d');
+                ctx.fillStyle = colorStr;
+                return ctx.fillStyle;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        document.getElementById('canvas-w').addEventListener('input', e => {
+            canvas.style.width = e.target.value + 'mm';
+            renderGridLayout();
+        });
+        document.getElementById('canvas-h').addEventListener('input', e => {
+            canvas.style.height = e.target.value + 'mm';
+            renderGridLayout();
+        });
         document.getElementById('toggle-grid').addEventListener('change', e => canvas.classList.toggle('show-grid', e.target.checked));
         document.getElementById('toggle-ruler').addEventListener('change', e => container.classList.toggle('show-ruler', e.target.checked));
         
@@ -198,12 +279,35 @@
             canvas.classList.toggle('force-arial', e.target.checked);
         });
 
-        // ================= 1. 导入图形 =================
+        // ================= 1. 导入图形 (支持 SVG / PNG / JPG) =================
         document.getElementById('file-upload').addEventListener('change', e => {
             Array.from(e.target.files).forEach((file, idx) => {
-                const reader = new FileReader();
-                reader.onload = evt => injectToCanvas(evt.target.result, file.name, idx);
-                reader.readAsText(file);
+                const fileNameLower = file.name.toLowerCase();
+                
+                if (fileNameLower.endsWith('.png') || fileNameLower.endsWith('.jpg') || fileNameLower.endsWith('.jpeg')) {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        const dataUrl = evt.target.result;
+                        const img = new Image();
+                        img.onload = function() {
+                            const w = img.width;
+                            const h = img.height;
+                            const svgContainerStr = `
+                                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+                                    <image href="${dataUrl}" xlink:href="${dataUrl}" width="${w}" height="${h}" />
+                                </svg>
+                            `.trim();
+                            injectToCanvas(svgContainerStr, file.name, idx);
+                        };
+                        img.src = dataUrl;
+                    };
+                    reader.readAsDataURL(file);
+                    
+                } else if (fileNameLower.endsWith('.svg')) {
+                    const reader = new FileReader();
+                    reader.onload = evt => injectToCanvas(evt.target.result, file.name, idx);
+                    reader.readAsText(file);
+                }
             });
             e.target.value = '';
         });
@@ -222,6 +326,17 @@
             const svgEl = wrapper.querySelector('svg');
             if(!svgEl) return;
             
+            if (!svgEl.getAttribute('xmlns')) svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            if (!svgEl.getAttribute('xmlns:xlink')) svgEl.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+            
+            svgEl.querySelectorAll('image').forEach(img => {
+                const hrefSrc = img.getAttribute('href') || img.getAttribute('xlink:href') || img.getAttribute('ns1:href');
+                if (hrefSrc) {
+                    img.setAttribute('href', hrefSrc);
+                    img.setAttribute('xlink:href', hrefSrc);
+                }
+            });
+            
             let origWidth = 300;
             if (svgEl.getAttribute('viewBox')) origWidth = parseFloat(svgEl.getAttribute('viewBox').split(/[ ,]+/)[2]);
             else if (svgEl.getAttribute('width')) origWidth = parseFloat(svgEl.getAttribute('width'));
@@ -230,44 +345,542 @@
             wrapper.style.width = '300px'; 
             wrapper.style.height = 'auto';
 
-            // 右下角等比缩放手柄与删除按钮
             const handle = document.createElement('div'); handle.className = 'resize-handle';
             const del = document.createElement('div'); del.className = 'delete-btn'; del.innerHTML = '×';
             del.onclick = (e) => { e.stopPropagation(); wrapper.remove(); closeInspector(); };
             
             wrapper.appendChild(handle); wrapper.appendChild(del);
 
-            // 植入上、下、左、右四个方向的边界微调手柄
             const edgeT = document.createElement('div'); edgeT.className = 'edge-handle edge-t';
             const edgeB = document.createElement('div'); edgeB.className = 'edge-handle edge-b';
             const edgeL = document.createElement('div'); edgeL.className = 'edge-handle edge-l';
             const edgeR = document.createElement('div'); edgeR.className = 'edge-handle edge-r';
             
-            wrapper.appendChild(edgeT);
-            wrapper.appendChild(edgeB);
-            wrapper.appendChild(edgeL);
-            wrapper.appendChild(edgeR);
+            wrapper.appendChild(edgeT); wrapper.appendChild(edgeB); wrapper.appendChild(edgeL); wrapper.appendChild(edgeR);
 
             canvas.appendChild(wrapper);
             initDragAndResize(wrapper, handle);
 
-            // 初始化四向拉伸交互
             initEdgeResize(wrapper, edgeT, 't');
             initEdgeResize(wrapper, edgeB, 'b');
             initEdgeResize(wrapper, edgeL, 'l');
             initEdgeResize(wrapper, edgeR, 'r');
 
+            wrapper.addEventListener('mousedown', () => {
+                document.querySelectorAll('.svg-wrapper').forEach(w => w.classList.remove('active'));
+                wrapper.classList.add('active');
+            });
+
             wrapper.addEventListener('dblclick', (e) => { e.stopPropagation(); openInspector(wrapper); });
         }
 
-        function colorToHex(colorStr) {
-            if (!colorStr || colorStr === 'none' || colorStr === 'transparent') return null;
-            const ctx = document.createElement('canvas').getContext('2d');
-            ctx.fillStyle = colorStr;
-            return ctx.fillStyle;
+        // ================= 2. 组图排版网格控制核心 =================
+        function createLayoutGrid() {
+            const rows = parseInt(document.getElementById('grid-rows').value) || 2;
+            const cols = parseInt(document.getElementById('grid-cols').value) || 2;
+
+            layoutGrid.rows = rows;
+            layoutGrid.cols = cols;
+            layoutGrid.rowSizes = Array(rows).fill(100 / rows);
+            layoutGrid.colSizes = Array(cols).fill(100 / cols);
+            layoutGrid.cells = [];
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    layoutGrid.cells.push({
+                        r: r,
+                        c: c,
+                        rSpan: 1,
+                        cSpan: 1,
+                        label: '',
+                        selected: false
+                    });
+                }
+            }
+            updateCellLabels();
+            renderGridLayout();
         }
 
-        // ================= 2. 富文本解析与单图边界微调算法 =================
+        function getLabelName(index) {
+            const style = document.getElementById('grid-label-style').value;
+            if (style === 'none') return '';
+            const chars = style === 'uppercase' ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ" : "abcdefghijklmnopqrstuvwxyz";
+            if (index < chars.length) return chars[index];
+            return chars[index % chars.length] + Math.floor(index / chars.length);
+        }
+
+        function updateCellLabels() {
+            let count = 0;
+            layoutGrid.cells.sort((a, b) => {
+                if (a.r !== b.r) return a.r - b.r;
+                return a.c - b.c;
+            });
+            layoutGrid.cells.forEach(cell => {
+                cell.label = getLabelName(count++);
+            });
+        }
+
+        function getCellRectPercent(cell) {
+            let left = 0;
+            for (let i = 0; i < cell.c; i++) {
+                left += layoutGrid.colSizes[i];
+            }
+            let top = 0;
+            for (let i = 0; i < cell.r; i++) {
+                top += layoutGrid.rowSizes[i];
+            }
+            let width = 0;
+            for (let i = 0; i < cell.cSpan; i++) {
+                width += layoutGrid.colSizes[cell.c + i];
+            }
+            let height = 0;
+            for (let i = 0; i < cell.rSpan; i++) {
+                height += layoutGrid.rowSizes[cell.r + i];
+            }
+            return { left, top, width, height };
+        }
+
+        function renderGridLayout() {
+            const layer = document.getElementById('grid-layout-layer');
+            layer.innerHTML = '';
+            if (layoutGrid.cells.length === 0) return;
+
+            layoutGrid.cells.forEach((cell, idx) => {
+                const rect = getCellRectPercent(cell);
+                const cellDiv = document.createElement('div');
+                cellDiv.className = `grid-cell ${cell.selected ? 'selected' : ''}`;
+                cellDiv.style.left = rect.left + '%';
+                cellDiv.style.top = rect.top + '%';
+                cellDiv.style.width = rect.width + '%';
+                cellDiv.style.height = rect.height + '%';
+                cellDiv.dataset.index = idx;
+
+                if (document.getElementById('grid-label-style').value !== 'none' && cell.label) {
+                    const labelSpan = document.createElement('span');
+                    labelSpan.className = 'grid-cell-label';
+                    labelSpan.style.fontSize = document.getElementById('grid-label-size').value + 'px';
+                    labelSpan.innerText = cell.label;
+                    cellDiv.appendChild(labelSpan);
+                }
+
+                layer.appendChild(cellDiv);
+            });
+
+            let accumCol = 0;
+            for (let i = 0; i < layoutGrid.cols - 1; i++) {
+                accumCol += layoutGrid.colSizes[i];
+                const resizer = document.createElement('div');
+                resizer.className = 'grid-resizer v-resizer';
+                resizer.style.left = `calc(${accumCol}% - 4px)`;
+                resizer.style.top = '0';
+                resizer.style.bottom = '0';
+                initGridColResizer(resizer, i);
+                layer.appendChild(resizer);
+            }
+
+            let accumRow = 0;
+            for (let i = 0; i < layoutGrid.rows - 1; i++) {
+                accumRow += layoutGrid.rowSizes[i];
+                const resizer = document.createElement('div');
+                resizer.className = 'grid-resizer h-resizer';
+                resizer.style.top = `calc(${accumRow}% - 4px)`;
+                resizer.style.left = '0';
+                resizer.style.right = '0';
+                initGridRowResizer(resizer, i);
+                layer.appendChild(resizer);
+            }
+        }
+
+        function initGridColResizer(resizer, colIdx) {
+            resizer.addEventListener('mousedown', e => {
+                e.stopPropagation();
+                e.preventDefault();
+                const canvasRect = canvas.getBoundingClientRect();
+                const startX = e.clientX;
+                const startLeftP = layoutGrid.colSizes[colIdx];
+                const startRightP = layoutGrid.colSizes[colIdx + 1];
+
+                function onMouseMove(mEv) {
+                    const deltaX = mEv.clientX - startX;
+                    const deltaPercent = (deltaX / canvasRect.width) * 100;
+                    let newLeft = startLeftP + deltaPercent;
+                    let newRight = startRightP - deltaPercent;
+
+                    if (newLeft > 3 && newRight > 3) {
+                        layoutGrid.colSizes[colIdx] = newLeft;
+                        layoutGrid.colSizes[colIdx + 1] = newRight;
+                        renderGridLayout();
+                    }
+                }
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        function initGridRowResizer(resizer, rowIdx) {
+            resizer.addEventListener('mousedown', e => {
+                e.stopPropagation();
+                e.preventDefault();
+                const canvasRect = canvas.getBoundingClientRect();
+                const startY = e.clientY;
+                const startTopP = layoutGrid.rowSizes[rowIdx];
+                const startBottomP = layoutGrid.rowSizes[rowIdx + 1];
+
+                function onMouseMove(mEv) {
+                    const deltaY = mEv.clientY - startY;
+                    const deltaPercent = (deltaY / canvasRect.height) * 100;
+                    let newTop = startTopP + deltaPercent;
+                    let newBottom = startBottomP - deltaPercent;
+
+                    if (newTop > 3 && newBottom > 3) {
+                        layoutGrid.rowSizes[rowIdx] = newTop;
+                        layoutGrid.rowSizes[rowIdx + 1] = newBottom;
+                        renderGridLayout();
+                    }
+                }
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        function mergeSelectedCells() {
+            const selected = layoutGrid.cells.filter(c => c.selected);
+            if (selected.length < 2) {
+                alert("请按住 Shift 键点击选择多个单元格后再合并。");
+                return;
+            }
+
+            let minR = Infinity, maxR = -Infinity;
+            let minC = Infinity, maxC = -Infinity;
+
+            selected.forEach(cell => {
+                minR = Math.min(minR, cell.r);
+                maxR = Math.max(maxR, cell.r + cell.rSpan - 1);
+                minC = Math.min(minC, cell.c);
+                maxC = Math.max(maxC, cell.c + cell.cSpan - 1);
+            });
+
+            let actualArea = 0;
+            selected.forEach(cell => {
+                actualArea += cell.rSpan * cell.cSpan;
+            });
+
+            const targetRSpan = maxR - minR + 1;
+            const targetCSpan = maxC - minC + 1;
+            const expectedArea = targetRSpan * targetCSpan;
+
+            if (actualArea !== expectedArea) {
+                alert("合并单元格失败：选中的格位必须能连结为一个矩形。");
+                return;
+            }
+
+            layoutGrid.cells = layoutGrid.cells.filter(c => !c.selected);
+
+            layoutGrid.cells.push({
+                r: minR,
+                c: minC,
+                rSpan: targetRSpan,
+                cSpan: targetCSpan,
+                label: '',
+                selected: true
+            });
+
+            updateCellLabels();
+            renderGridLayout();
+            closeInspector();
+        }
+
+        function splitSelectedCells() {
+            const selected = layoutGrid.cells.filter(c => c.selected);
+            if (selected.length === 0) {
+                alert("请点击选择一个已经合并过的网格进行拆分。");
+                return;
+            }
+
+            let processed = false;
+            const nextCells = [];
+
+            layoutGrid.cells.forEach(cell => {
+                if (cell.selected && (cell.rSpan > 1 || cell.cSpan > 1)) {
+                    processed = true;
+                    for (let r = 0; r < cell.rSpan; r++) {
+                        for (let c = 0; c < cell.cSpan; c++) {
+                            nextCells.push({
+                                r: cell.r + r,
+                                c: cell.c + c,
+                                rSpan: 1,
+                                cSpan: 1,
+                                label: '',
+                                selected: false
+                            });
+                        }
+                    }
+                } else {
+                    nextCells.push(cell);
+                }
+            });
+
+            if (!processed) {
+                alert("选中的网格本身已是最小单元格，无法进行拆分。");
+                return;
+            }
+
+            layoutGrid.cells = nextCells;
+            updateCellLabels();
+            renderGridLayout();
+            closeInspector();
+        }
+
+        function alignSelectedToCell() {
+            const activeWrapper = document.querySelector('.svg-wrapper.active');
+            const selectedCell = layoutGrid.cells.find(c => c.selected);
+
+            if (!activeWrapper) {
+                alert("请先点击选中画布上需要对齐的图形文件。");
+                return;
+            }
+            if (!selectedCell) {
+                alert("请在排版网格中选中一个目标单元格。");
+                return;
+            }
+
+            alignWrapperToGridCell(activeWrapper, selectedCell);
+        }
+
+        function alignWrapperToGridCell(wrapper, cell) {
+            const canvasRect = canvas.getBoundingClientRect();
+            const rectPercent = getCellRectPercent(cell);
+
+            const cellLeftPx = (rectPercent.left / 100) * canvasRect.width;
+            const cellTopPx = (rectPercent.top / 100) * canvasRect.height;
+            const cellWidthPx = (rectPercent.width / 100) * canvasRect.width;
+            const cellHeightPx = (rectPercent.height / 100) * canvasRect.height;
+
+            const padding = parseFloat(document.getElementById('grid-align-padding').value);
+            const boxMaxW = Math.max(10, cellWidthPx - padding * 2);
+            const boxMaxH = Math.max(10, cellHeightPx - padding * 2);
+
+            const svgEl = wrapper.querySelector('svg');
+            if (!svgEl) return;
+
+            let origW = parseFloat(wrapper.dataset.origWidth) || 300;
+            let origH = 300;
+            let viewBoxStr = svgEl.getAttribute('viewBox');
+            if (viewBoxStr) {
+                const parts = viewBoxStr.split(/[ ,]+/).map(Number);
+                if (parts.length === 4) {
+                    origW = parts[2];
+                    origH = parts[3];
+                }
+            } else if (svgEl.getAttribute('height')) {
+                origH = parseFloat(svgEl.getAttribute('height'));
+            }
+
+            const ratio = origW / origH;
+            let targetW = boxMaxW;
+            let targetH = boxMaxW / ratio;
+
+            if (targetH > boxMaxH) {
+                targetH = boxMaxH;
+                targetW = boxMaxH * ratio;
+            }
+
+            const finalLeft = cellLeftPx + padding + (boxMaxW - targetW) / 2;
+            const finalTop = cellTopPx + padding + (boxMaxH - targetH) / 2;
+
+            wrapper.style.left = finalLeft + 'px';
+            wrapper.style.top = finalTop + 'px';
+            wrapper.style.width = targetW + 'px';
+            wrapper.style.height = targetH + 'px';
+
+            if (activeEditWrapper === wrapper) {
+                openInspector(wrapper);
+            }
+        }
+
+        function distributeAllToGrid() {
+            const wrappers = Array.from(document.querySelectorAll('.svg-wrapper'));
+            if (wrappers.length === 0) {
+                alert("画布中未发现任何可用的排版图片。");
+                return;
+            }
+            if (layoutGrid.cells.length === 0) {
+                alert("请先创建布局网格。");
+                return;
+            }
+
+            wrappers.forEach((wrapper, idx) => {
+                const cell = layoutGrid.cells[idx % layoutGrid.cells.length];
+                alignWrapperToGridCell(wrapper, cell);
+            });
+        }
+
+        // ================= 3. 工程管理 (导出与导入暂存结构) =================
+        function exportProject() {
+            const projectData = {
+                version: "1.0",
+                canvas: {
+                    widthMm: document.getElementById('canvas-w').value,
+                    heightMm: document.getElementById('canvas-h').value,
+                    forceArial: forceArialCheckbox.checked,
+                    showGrid: document.getElementById('toggle-grid').checked,
+                    snap: snapCheckbox.checked,
+                    labelStyle: document.getElementById('grid-label-style').value,
+                    labelSize: document.getElementById('grid-label-size').value,
+                    alignPadding: document.getElementById('grid-align-padding').value
+                },
+                grid: {
+                    rows: layoutGrid.rows,
+                    cols: layoutGrid.cols,
+                    rowSizes: layoutGrid.rowSizes,
+                    colSizes: layoutGrid.colSizes,
+                    cells: layoutGrid.cells.map(c => ({
+                        r: c.r,
+                        c: c.c,
+                        rSpan: c.rSpan,
+                        cSpan: c.cSpan,
+                        label: c.label,
+                        selected: c.selected
+                    }))
+                },
+                elements: []
+            };
+
+            document.querySelectorAll('.svg-wrapper').forEach(wrapper => {
+                const svgEl = wrapper.querySelector('svg');
+                if (!svgEl) return;
+                
+                const serializer = new XMLSerializer();
+                const svgContent = serializer.serializeToString(svgEl);
+
+                projectData.elements.push({
+                    filename: wrapper.dataset.filename || "image.svg",
+                    origWidth: wrapper.dataset.origWidth || "300",
+                    left: wrapper.style.left,
+                    top: wrapper.style.top,
+                    width: wrapper.style.width,
+                    height: wrapper.style.height,
+                    zIndex: wrapper.style.zIndex,
+                    svgContent: svgContent
+                });
+            });
+
+            const jsonStr = JSON.stringify(projectData, null, 2);
+            triggerDownload(jsonStr, 'SCI_Layout_Project.json');
+        }
+
+        function importProject(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.version !== "1.0") {
+                        alert("不兼容的工程文件版本！");
+                        return;
+                    }
+
+                    // 1. 清空画布
+                    document.querySelectorAll('.svg-wrapper').forEach(w => w.remove());
+                    closeInspector();
+
+                    // 2. 还原画布属性
+                    document.getElementById('canvas-w').value = data.canvas.widthMm;
+                    document.getElementById('canvas-h').value = data.canvas.heightMm;
+                    canvas.style.width = data.canvas.widthMm + 'mm';
+                    canvas.style.height = data.canvas.heightMm + 'mm';
+
+                    forceArialCheckbox.checked = data.canvas.forceArial;
+                    canvas.classList.toggle('force-arial', data.canvas.forceArial);
+
+                    document.getElementById('toggle-grid').checked = data.canvas.showGrid;
+                    canvas.classList.toggle('show-grid', data.canvas.showGrid);
+
+                    snapCheckbox.checked = data.canvas.snap;
+                    document.getElementById('grid-label-style').value = data.canvas.labelStyle;
+                    document.getElementById('grid-label-size').value = data.canvas.labelSize;
+                    document.getElementById('grid-align-padding').value = data.canvas.alignPadding;
+
+                    // 3. 还原网格状态
+                    layoutGrid.rows = data.grid.rows;
+                    layoutGrid.cols = data.grid.cols;
+                    layoutGrid.rowSizes = data.grid.rowSizes;
+                    layoutGrid.colSizes = data.grid.colSizes;
+                    layoutGrid.cells = data.grid.cells.map(c => ({
+                        r: c.r,
+                        c: c.c,
+                        rSpan: c.rSpan,
+                        cSpan: c.cSpan,
+                        label: c.label,
+                        selected: c.selected || false
+                    }));
+                    renderGridLayout();
+
+                    // 4. 还原图片及其交互手柄
+                    let maxZ = 10;
+                    data.elements.forEach((el) => {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'svg-wrapper';
+                        wrapper.dataset.filename = el.filename;
+                        wrapper.dataset.origWidth = el.origWidth;
+                        wrapper.style.left = el.left;
+                        wrapper.style.top = el.top;
+                        wrapper.style.width = el.width;
+                        wrapper.style.height = el.height;
+                        wrapper.style.zIndex = el.zIndex;
+                        wrapper.innerHTML = el.svgContent;
+
+                        let z = parseInt(el.zIndex) || 10;
+                        if (z > maxZ) maxZ = z;
+
+                        const handle = document.createElement('div'); handle.className = 'resize-handle';
+                        const del = document.createElement('div'); del.className = 'delete-btn'; del.innerHTML = '×';
+                        del.onclick = (ev) => { ev.stopPropagation(); wrapper.remove(); closeInspector(); };
+                        
+                        wrapper.appendChild(handle); wrapper.appendChild(del);
+
+                        const edgeT = document.createElement('div'); edgeT.className = 'edge-handle edge-t';
+                        const edgeB = document.createElement('div'); edgeB.className = 'edge-handle edge-b';
+                        const edgeL = document.createElement('div'); edgeL.className = 'edge-handle edge-l';
+                        const edgeR = document.createElement('div'); edgeR.className = 'edge-handle edge-r';
+                        
+                        wrapper.appendChild(edgeT); wrapper.appendChild(edgeB); wrapper.appendChild(edgeL); wrapper.appendChild(edgeR);
+
+                        canvas.appendChild(wrapper);
+                        initDragAndResize(wrapper, handle);
+
+                        initEdgeResize(wrapper, edgeT, 't');
+                        initEdgeResize(wrapper, edgeB, 'b');
+                        initEdgeResize(wrapper, edgeL, 'l');
+                        initEdgeResize(wrapper, edgeR, 'r');
+
+                        wrapper.addEventListener('mousedown', () => {
+                            document.querySelectorAll('.svg-wrapper').forEach(w => w.classList.remove('active'));
+                            wrapper.classList.add('active');
+                        });
+
+                        wrapper.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInspector(wrapper); });
+                    });
+                    
+                    zIndexCounter = maxZ + 1;
+                    document.getElementById('project-upload').value = '';
+                } catch (err) {
+                    console.error("暂存工程加载失败: ", err);
+                    alert("暂存项目文件解析失败，请确认工程文件完整。");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // ================= 4. 富文本编辑与等比缩放 =================
         function parseSvgToHtml(svgTextHtml) {
             let html = svgTextHtml;
             html = html.replace(/<tspan[^>]*font-weight=["']bold["'][^>]*>(.*?)<\/tspan>/gi, '<b>$1</b>');
@@ -291,7 +904,6 @@
             return svgStr;
         }
 
-        // 高级四向非等比拉伸功能（只改变 viewBox 和容器位置，内容不进行缩放）
         function initEdgeResize(wrapper, edgeEl, direction) {
             let startX, startY, startLeft, startTop, startWidth, startHeight;
             let minX, minY, vbW, vbH, scale;
@@ -317,7 +929,7 @@
                             [minX, minY, vbW, vbH] = parts;
                         }
                     }
-                    scale = startWidth / vbW; // 像素到内部 viewBox 的比例换算 (1 viewBox unit = scale pixels)
+                    scale = startWidth / vbW; 
                 }
 
                 function onMouseMove(moveEv) {
@@ -350,7 +962,6 @@
                         newMinY = minY + (deltaY / scale); 
                     }
 
-                    // 最小尺寸约束
                     if (newWidth < 50) {
                         if (direction.includes('l')) {
                             newLeft = startLeft + (startWidth - 50);
@@ -375,7 +986,6 @@
                     const newVbH = newHeight / scale;
                     svgEl.setAttribute('viewBox', `${newMinX} ${newMinY} ${newVbW} ${newVbH}`);
                     
-                    // 同步到单图面板中
                     const imgWInput = document.getElementById('img-canvas-w');
                     const imgHInput = document.getElementById('img-canvas-h');
                     if (activeEditWrapper === wrapper && imgWInput && imgHInput) {
@@ -384,7 +994,6 @@
                     }
                 }
 
-                // 松开鼠标，解除事件绑定
                 function onMouseUp() {
                     document.removeEventListener('mousemove', onMouseMove);
                     document.removeEventListener('mouseup', onMouseUp);
@@ -395,7 +1004,6 @@
             });
         }
 
-        // 原单图边界属性调整
         function adjustSvgCanvasSize(wrapper, newWidth, newHeight) {
             const svgEl = wrapper.querySelector('svg');
             if (!svgEl) return;
@@ -427,7 +1035,6 @@
             svgEl.setAttribute('viewBox', `${minX} ${minY} ${newVbW} ${newVbH}`);
         }
 
-        // 清理文本框高亮状态
         function clearTextSelection() {
             selectedTextNodes.forEach(node => {
                 node.classList.remove('selected-text-node');
@@ -435,7 +1042,7 @@
             selectedTextNodes = [];
         }
 
-        // ================= 3. 属性检查器 (单图与批量多图编辑) =================
+        // ================= 5. 属性检查器面板渲染 =================
         const inspectorPanel = document.getElementById('inspector');
         const fontListDiv = document.getElementById('font-list');
         const colorListDiv = document.getElementById('color-list');
@@ -447,7 +1054,54 @@
             clearTextSelection();
         }
 
-        // 单图面板
+        function updateGridInspector() {
+            const selectedCell = layoutGrid.cells.find(c => c.selected);
+            if (!selectedCell) return;
+
+            activeEditWrapper = null;
+            clearTextSelection();
+
+            document.getElementById('inspector-main-title').innerText = "单元格属性";
+            document.getElementById('canvas-resize-group').style.display = 'none';
+            document.getElementById('font-group-title').innerText = "网格字母标注";
+            document.getElementById('color-group-title').innerText = "网格信息";
+            document.getElementById('text-group-title').innerText = "排版对齐";
+
+            fontListDiv.innerHTML = '';
+            const row = document.createElement('div');
+            row.className = 'prop-item';
+            row.innerHTML = `
+                <span>自定义角标文本:</span>
+                <input type="text" id="grid-cell-label-input" value="${selectedCell.label}" style="width: 120px; padding:4px; border:1px solid #ccc; border-radius:4px;">
+            `;
+            row.querySelector('input').addEventListener('input', (e) => {
+                selectedCell.label = e.target.value;
+                renderGridLayout();
+            });
+            fontListDiv.appendChild(row);
+
+            colorListDiv.innerHTML = '';
+            const desc = document.createElement('div');
+            desc.className = 'prop-item';
+            desc.style.flexDirection = 'column';
+            desc.style.alignItems = 'flex-start';
+            desc.innerHTML = `
+                <div style="margin-bottom: 4px;">网格行列: 行 ${selectedCell.r + 1}，列 ${selectedCell.c + 1}</div>
+                <div>单元跨度: 行跨 ${selectedCell.rSpan}，列跨 ${selectedCell.cSpan}</div>
+            `;
+            colorListDiv.appendChild(desc);
+
+            textListDiv.innerHTML = '';
+            const btnAlign = document.createElement('button');
+            btnAlign.className = 'btn';
+            btnAlign.style.background = 'var(--primary-color)';
+            btnAlign.innerText = '使选中图片自动贴合此格子';
+            btnAlign.onclick = () => alignSelectedToCell();
+            textListDiv.appendChild(btnAlign);
+
+            inspectorPanel.classList.add('open');
+        }
+
         function openInspector(wrapper) {
             clearTextSelection();
             activeEditWrapper = wrapper;
@@ -509,7 +1163,6 @@
         function renderInspectorUI(fontsMap, colorsMap, textNodes, scale) {
             fontListDiv.innerHTML = ''; colorListDiv.innerHTML = ''; textListDiv.innerHTML = '';
 
-            // --- 渲染字体大小 ---
             Array.from(fontsMap.keys()).sort((a,b)=>a-b).forEach(visualSize => {
                 const row = document.createElement('div');
                 row.className = 'prop-item';
@@ -543,7 +1196,6 @@
                 fontListDiv.appendChild(row);
             });
 
-            // --- 渲染颜色 ---
             Array.from(colorsMap.keys()).forEach(hexStr => {
                 const row = document.createElement('div');
                 row.className = 'prop-item';
@@ -569,7 +1221,6 @@
                 colorListDiv.appendChild(row);
             });
 
-            // --- 渲染富文本编辑器 ---
             if (textNodes.length === 0) {
                 textListDiv.innerHTML = '<span style="color:#999;font-size:12px;">未检测到可编辑文本</span>';
                 return;
@@ -602,7 +1253,6 @@
             });
         }
 
-        // 批量文本编辑面板 UI
         function openTextNodesInspector(nodes) {
             activeEditWrapper = null;
             fontListDiv.innerHTML = '';
@@ -615,7 +1265,6 @@
             document.getElementById('color-group-title').innerText = "批量填充颜色";
             document.getElementById('text-group-title').innerText = "已选文本列表";
 
-            // 批量字号修改
             const fontRow = document.createElement('div');
             fontRow.className = 'prop-item';
             fontRow.innerHTML = `
@@ -641,7 +1290,6 @@
             });
             fontListDiv.appendChild(fontRow);
 
-            // 批量文本颜色修改
             const colorRow = document.createElement('div');
             colorRow.className = 'prop-item';
             colorRow.innerHTML = `
@@ -660,7 +1308,6 @@
             });
             colorListDiv.appendChild(colorRow);
 
-            // 显示选中列表前15条摘要
             const listBlock = document.createElement('div');
             listBlock.style.fontSize = '12px';
             listBlock.style.color = '#555';
@@ -686,13 +1333,12 @@
             inspectorPanel.classList.add('open');
         }
 
-        // ================= 4. 拖拽、缩放与矩形框选 =================
+        // ================= 6. 拖拽、缩放与矩形框选 =================
         function initDragAndResize(wrapper, handle) {
             let isDragging = false, isResizing = false;
             let startX, startY, startLeft, startTop, startWidth, ratio;
 
             wrapper.addEventListener('mousedown', e => {
-                // 如果点击了边缘手柄、删除按钮或缩放手柄，不启动容器拖拽
                 if (e.target.classList.contains('edge-handle') || e.target === handle || e.target.classList.contains('delete-btn')) return;
                 
                 isDragging = true; wrapper.style.zIndex = zIndexCounter++;
@@ -731,71 +1377,121 @@
             document.addEventListener('mouseup', () => { isDragging = false; isResizing = false; });
         }
 
-        // 鼠标拖拽框选：检测并框选文本框
+        // 统一画布鼠标监听（包含排版网格的单击选择与拖拽模式下的框选）
         canvas.addEventListener('mousedown', e => {
-            if (e.target === canvas) {
-                // 清空选中状态
-                document.querySelectorAll('.svg-wrapper').forEach(w => w.classList.remove('active'));
-                clearTextSelection();
-                closeInspector();
+            const isCanvasBackground = e.target === canvas || 
+                                       e.target.id === 'grid-layout-layer' || 
+                                       e.target.classList.contains('grid-cell') || 
+                                       e.target.classList.contains('grid-cell-label');
+                                       
+            if (!isCanvasBackground) return;
 
-                const rect = canvas.getBoundingClientRect();
-                const startX = e.clientX - rect.left;
-                const startY = e.clientY - rect.top;
+            // 识别是否点击在特定网格单元上
+            const clickedCellEl = e.target.closest('.grid-cell');
+            let cellObj = null;
+            if (clickedCellEl) {
+                const idx = parseInt(clickedCellEl.dataset.index);
+                cellObj = layoutGrid.cells[idx];
+            }
 
-                const selBox = document.createElement('div');
-                selBox.className = 'selection-box';
-                selBox.style.left = startX + 'px';
-                selBox.style.top = startY + 'px';
-                selBox.style.width = '0px';
-                selBox.style.height = '0px';
-                canvas.appendChild(selBox);
+            document.querySelectorAll('.svg-wrapper').forEach(w => w.classList.remove('active'));
+            
+            const rect = canvas.getBoundingClientRect();
+            const startX = e.clientX - rect.left;
+            const startY = e.clientY - rect.top;
+            const clientStartX = e.clientX;
+            const clientStartY = e.clientY;
 
-                function onMouseMove(moveEv) {
-                    const curX = moveEv.clientX - rect.left;
-                    const curY = moveEv.clientY - rect.top;
+            let selBox = null;
+            let hasMoved = false;
 
-                    const left = Math.min(startX, curX);
-                    const top = Math.min(startY, curY);
-                    const width = Math.abs(startX - curX);
-                    const height = Math.abs(startY - curY);
+            function onMouseMove(moveEv) {
+                const dist = Math.hypot(moveEv.clientX - clientStartX, moveEv.clientY - clientStartY);
+                if (dist > 5) {
+                    if (!hasMoved) {
+                        hasMoved = true;
+                        // 一旦识别为拖拽框选行为，清除网格的选择状态
+                        layoutGrid.cells.forEach(c => c.selected = false);
+                        renderGridLayout();
+                        clearTextSelection();
+                        closeInspector();
 
-                    selBox.style.left = left + 'px';
-                    selBox.style.top = top + 'px';
-                    selBox.style.width = width + 'px';
-                    selBox.style.height = height + 'px';
+                        selBox = document.createElement('div');
+                        selBox.className = 'selection-box';
+                        selBox.style.left = startX + 'px';
+                        selBox.style.top = startY + 'px';
+                        selBox.style.width = '0px';
+                        selBox.style.height = '0px';
+                        canvas.appendChild(selBox);
+                    }
 
-                    // 检索并高亮区域内的所有文本节点(text, tspan)
-                    selectedTextNodes = [];
-                    document.querySelectorAll('.svg-wrapper svg text, .svg-wrapper svg tspan').forEach(node => {
-                        if (isIntersecting(selBox, node)) {
-                            node.classList.add('selected-text-node');
-                            selectedTextNodes.push(node);
-                        } else {
-                            node.classList.remove('selected-text-node');
-                        }
-                    });
+                    if (selBox) {
+                        const curX = moveEv.clientX - rect.left;
+                        const curY = moveEv.clientY - rect.top;
+
+                        const left = Math.min(startX, curX);
+                        const top = Math.min(startY, curY);
+                        const width = Math.abs(startX - curX);
+                        const height = Math.abs(startY - curY);
+
+                        selBox.style.left = left + 'px';
+                        selBox.style.top = top + 'px';
+                        selBox.style.width = width + 'px';
+                        selBox.style.height = height + 'px';
+
+                        selectedTextNodes = [];
+                        document.querySelectorAll('.svg-wrapper svg text, .svg-wrapper svg tspan').forEach(node => {
+                            if (isIntersecting(selBox, node)) {
+                                node.classList.add('selected-text-node');
+                                selectedTextNodes.push(node);
+                            } else {
+                                node.classList.remove('selected-text-node');
+                            }
+                        });
+                    }
+                }
+            }
+
+            function onMouseUp(upEv) {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+
+                if (selBox) {
+                    selBox.remove();
                 }
 
-                function onMouseUp() {
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                    selBox.remove();
-
-                    // 如果框选了文本，展示批量文本编辑界面
+                if (hasMoved) {
+                    // 框选行为结束：如果有选中的文本节点，则打开批量控制台
                     if (selectedTextNodes.length > 0) {
                         openTextNodesInspector(selectedTextNodes);
                     } else {
                         closeInspector();
                     }
+                } else {
+                    // 无拖拽，判定为普通单击行为：切换网格单元的选中状态
+                    if (cellObj) {
+                        if (upEv.shiftKey || upEv.ctrlKey) {
+                            cellObj.selected = !cellObj.selected;
+                        } else {
+                            layoutGrid.cells.forEach(c => c.selected = false);
+                            cellObj.selected = true;
+                        }
+                        renderGridLayout();
+                        updateGridInspector();
+                    } else {
+                        // 点击空白区域
+                        layoutGrid.cells.forEach(c => c.selected = false);
+                        renderGridLayout();
+                        clearTextSelection();
+                        closeInspector();
+                    }
                 }
-
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
             }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
         });
 
-        // 基于 DOM 视口矩形精准碰撞检测
         function isIntersecting(box, element) {
             const rectB = box.getBoundingClientRect();
             const rectE = element.getBoundingClientRect();
@@ -805,7 +1501,7 @@
                      rectB.top > rectE.bottom);
         }
 
-        // ================= 5. 导出逻辑 =================
+        // ================= 7. 导出与下载 =================
         function triggerDownload(content, filename) {
             const blob = new Blob([content], {type: 'image/svg+xml;charset=utf-8'});
             const url = URL.createObjectURL(blob);
@@ -819,7 +1515,7 @@
             const canvasH = parseFloat(document.getElementById('canvas-h').value);
             const pxW = canvasW * 3.78; const pxH = canvasH * 3.78;
 
-            let compositeSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}mm" height="${canvasH}mm" viewBox="0 0 ${pxW} ${pxH}">\n<rect width="100%" height="100%" fill="white"/>\n`;
+            let compositeSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${canvasW}mm" height="${canvasH}mm" viewBox="0 0 ${pxW} ${pxH}">\n<rect width="100%" height="100%" fill="white"/>\n`;
             
             if (forceArialCheckbox.checked) {
                 compositeSvg += `<style>text, tspan, textPath { font-family: Arial, Helvetica, sans-serif !important; }</style>\n`;
@@ -834,13 +1530,29 @@
                 const finalW = wRect.width * scaleX; const finalH = wRect.height * scaleX;
                 const viewBox = svgEl.getAttribute('viewBox') || `0 0 ${wrapper.dataset.origWidth} ${wrapper.dataset.origWidth}`;
                 
-                // 去除高亮和闪烁样式类再进行拼接
                 let cleanHtml = svgEl.innerHTML
                     .replace(/class="[^"]*highlight-blink[^"]*"/g, '')
                     .replace(/class="[^"]*selected-text-node[^"]*"/g, '');
                 
                 compositeSvg += `<svg x="${finalX}" y="${finalY}" width="${finalW}" height="${finalH}" viewBox="${viewBox}">\n${cleanHtml}\n</svg>\n`;
             });
+
+            const labelStyle = document.getElementById('grid-label-style').value;
+            if (labelStyle !== 'none' && layoutGrid.cells.length > 0) {
+                const baseLabelSize = parseFloat(document.getElementById('grid-label-size').value) || 24;
+                const scale = pxW / canvas.getBoundingClientRect().width;
+                const outLabelSize = baseLabelSize * scale;
+
+                layoutGrid.cells.forEach(cell => {
+                    if (!cell.label) return;
+                    const rPercent = getCellRectPercent(cell);
+                    const lx = ((rPercent.left / 100) * pxW) + (10 * scale);
+                    const ly = ((rPercent.top / 100) * pxH) + ((baseLabelSize + 6) * scale);
+
+                    compositeSvg += `<text x="${lx}" y="${ly}" font-family="Arial, Helvetica, sans-serif" font-size="${outLabelSize}" font-weight="bold" fill="#333">${cell.label}</text>\n`;
+                });
+            }
+
             compositeSvg += `</svg>`;
             triggerDownload(compositeSvg, 'SCI_Composite_Figure.svg');
         });
@@ -854,7 +1566,6 @@
                 if (!svgEl) return;
                 const clonedSvg = svgEl.cloneNode(true);
                 
-                // 清理所有可能导出的多余临时样式
                 clonedSvg.querySelectorAll('.highlight-blink').forEach(el => el.classList.remove('highlight-blink'));
                 clonedSvg.querySelectorAll('.selected-text-node').forEach(el => el.classList.remove('selected-text-node'));
                 
@@ -865,10 +1576,12 @@
                 }
 
                 if (!clonedSvg.getAttribute('xmlns')) clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                if (!clonedSvg.getAttribute('xmlns:xlink')) clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+                
                 let originalName = wrapper.dataset.filename || `figure_${index + 1}.svg`;
                 setTimeout(() => triggerDownload(clonedSvg.outerHTML, originalName.replace('.svg', '_modified.svg')), index * 300);
             });
         });
     </script>
-</body>
-</html>
+
+</body></html>
