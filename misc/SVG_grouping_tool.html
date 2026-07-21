@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>SVG 组图排版工具</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5; --panel-bg: #ffffff; --border-color: #d9d9d9;
+            --primary-color: #1890ff; --grid-size: 20px;
+        }
+        body { margin: 0; font-family: -apple-system, sans-serif; background-color: var(--bg-color); display: flex; height: 100vh; overflow: hidden; }
+        
+        /* 侧边栏 */
+        .sidebar {
+            width: 300px; background: var(--panel-bg); border-right: 1px solid var(--border-color);
+            padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.05); z-index: 10; overflow-y: auto;
+        }
+        .section-title { font-size: 16px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; color: #333;}
+        .row { display: flex; gap: 10px; align-items: center; margin-bottom: 5px; font-size: 14px;}
+        input[type="number"] { width: 70px; padding: 4px; border: 1px solid #ccc; border-radius: 4px;}
+        input[type="file"] { display: none; }
+        
+        .btn { background: var(--primary-color); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; text-align: center; transition: 0.2s; width: 100%; box-sizing: border-box;}
+        .btn:hover { opacity: 0.8; }
+        .btn-export { background: #52c41a; font-weight: bold; padding: 12px;}
+        .btn-export-batch { background: #fa8c16; padding: 12px; margin-top: 5px;}
+        
+        /* 画布区域 */
+        .main-area { flex: 1; padding: 40px; overflow: auto; display: flex; justify-content: center; align-items: flex-start; }
+        .canvas-container { position: relative; }
+        .ruler { position: absolute; background: #fff; z-index: 5; display: none; }
+        .ruler-h { top: -20px; left: 0; right: 0; height: 20px; border-bottom: 1px solid #000; background-image: repeating-linear-gradient(to right, transparent, transparent 9px, #666 10px); background-size: 10px 100%; }
+        .ruler-v { left: -20px; top: 0; bottom: 0; width: 20px; border-right: 1px solid #000; background-image: repeating-linear-gradient(to bottom, transparent, transparent 9px, #666 10px); background-size: 100% 10px; }
+        .show-ruler .ruler { display: block; }
+
+        .canvas { width: 380mm; height: 220mm; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; transform-origin: top left; }
+        .canvas.show-grid { background-image: linear-gradient(to right, #e8e8e8 1px, transparent 1px), linear-gradient(to bottom, #e8e8e8 1px, transparent 1px); background-size: var(--grid-size) var(--grid-size); }
+
+        /* 强制字体样式 */
+        .canvas.force-arial text, 
+        .canvas.force-arial tspan, 
+        .canvas.force-arial textPath {
+            font-family: Arial, Helvetica, sans-serif !important;
+        }
+
+        /* SVG 容器 */
+        .svg-wrapper { position: absolute; border: 1px dashed transparent; box-sizing: border-box; cursor: move; min-width: 50px; min-height: 50px; }
+        .svg-wrapper:hover, .svg-wrapper.active { border-color: var(--primary-color); }
+        .svg-wrapper svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+        
+        .resize-handle { position: absolute; width: 10px; height: 10px; background: var(--primary-color); bottom: -5px; right: -5px; cursor: se-resize; border-radius: 50%; display: none; }
+        .delete-btn { position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; background: #ff4d4f; color: white; border-radius: 50%; text-align: center; line-height: 18px; cursor: pointer; display: none; font-size: 12px; font-weight: bold; }
+        .svg-wrapper:hover .resize-handle, .svg-wrapper.active .resize-handle, .svg-wrapper:hover .delete-btn, .svg-wrapper.active .delete-btn { display: block; }
+
+        /* 动画：灯泡闪烁定位 */
+        @keyframes svg-blink {
+            0%, 100% { fill: inherit; font-weight: inherit; filter: none; }
+            50% { fill: #9c27b0 !important; font-weight: bold !important; filter: drop-shadow(0 0 5px rgba(156,39,176,0.8)); text-shadow: 0 0 5px rgba(156,39,176,0.8); }
+        }
+        .highlight-blink { animation: svg-blink 0.5s ease-in-out 6; }
+
+        /* 属性面板 */
+        .inspector-panel {
+            position: fixed; right: 0; top: 0; bottom: 0; width: 380px; background: white;
+            box-shadow: -4px 0 15px rgba(0,0,0,0.1); z-index: 100; transform: translateX(100%);
+            transition: transform 0.3s; display: flex; flex-direction: column;
+        }
+        .inspector-panel.open { transform: translateX(0); }
+        .inspector-header { padding: 15px 20px; background: #fafafa; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .inspector-header h3 { margin: 0; font-size: 16px; color: var(--primary-color);}
+        .close-btn { cursor: pointer; font-size: 20px; color: #999; border: none; background: none;}
+        .inspector-body { padding: 20px; overflow-y: auto; flex: 1; }
+        
+        .prop-group { margin-bottom: 25px; }
+        .prop-title { font-size: 13px; color: #888; text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px dashed #eee; padding-bottom: 5px; font-weight: bold;}
+        .prop-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;}
+        .prop-item input[type="number"] { width: 60px; }
+        .prop-item input[type="color"] { width: 30px; height: 30px; padding: 0; border: none; cursor: pointer; background: none; }
+        
+        .btn-icon { background: none; border: 1px solid #ccc; cursor: pointer; border-radius: 4px; padding: 2px 6px; margin-left: 5px; font-size: 14px;}
+        .btn-icon:hover { background: #eee; }
+
+        /* 富文本编辑器样式 */
+        .text-editor-block { background: #fff; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; padding: 5px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);}
+        .text-toolbar { display: flex; gap: 5px; padding-bottom: 5px; border-bottom: 1px solid #eee; margin-bottom: 5px; }
+        .text-toolbar button { font-family: serif; font-size: 13px; cursor: pointer; border: 1px solid #ccc; background: white; border-radius: 3px; width: 24px; height: 24px; }
+        .text-toolbar button:hover { background: #f0f0f0; }
+        .text-content-editable { font-size: 14px; min-height: 24px; padding: 5px; outline: none; word-wrap: break-word;}
+        .text-content-editable:focus { border: 1px dashed var(--primary-color); }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2 style="margin-bottom: 0;">SVG 组图工具</h2>
+        <p style="font-size:12px; color:#666; margin-top:5px;">💡 双击图片开启字体、颜色、文本编辑。</p>
+        
+        <div class="section-title">1. 画布设置</div>
+        <div class="row">
+            <label>宽(mm):</label> <input type="number" id="canvas-w" value="380">
+            <label>高(mm):</label> <input type="number" id="canvas-h" value="220">
+        </div>
+        <div class="row"><label><input type="checkbox" id="toggle-grid" checked> 显示网格</label></div>
+        <div class="row"><label><input type="checkbox" id="toggle-ruler"> 显示标尺</label></div>
+        <div class="row"><label><input type="checkbox" id="toggle-snap"> 拖拽时吸附网格</label></div>
+        <div class="row"><label><input type="checkbox" id="force-arial" checked> 全部使用 Arial 字体</label></div>
+
+        <div class="section-title">2. 导入图形</div>
+        <label for="file-upload" class="btn">添加 SVG 文件</label>
+        <input type="file" id="file-upload" accept=".svg" multiple>
+
+        <div style="flex-grow: 1;"></div>
+        
+        <div class="section-title">3. 导出结果</div>
+        <button class="btn btn-export" id="btn-export-combined">导出总图</button>
+        <button class="btn btn-export-batch" id="btn-export-batch">批量导出小图</button>
+    </div>
+
+    <div class="main-area">
+        <div class="canvas-container" id="canvas-container">
+            <div class="ruler ruler-h"></div>
+            <div class="ruler ruler-v"></div>
+            <div class="canvas show-grid force-arial" id="canvas"></div>
+        </div>
+    </div>
+
+    <!-- 属性检查器面板 -->
+    <div class="inspector-panel" id="inspector">
+        <div class="inspector-header">
+            <h3>单图高级编辑</h3>
+            <button class="close-btn" onclick="closeInspector()">×</button>
+        </div>
+        <div class="inspector-body">
+            <div class="prop-group">
+                <div class="prop-title">字体大小 (批量修改)</div>
+                <div id="font-list"></div>
+            </div>
+            <div class="prop-group">
+                <div class="prop-title">颜色修改</div>
+                <div id="color-list"></div>
+            </div>
+            <div class="prop-group">
+                <div class="prop-title">文本编辑</div>
+                <div id="text-editor-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const container = document.getElementById('canvas-container');
+        const gridSize = 20;
+        let zIndexCounter = 10;
+        let activeEditWrapper = null;
+
+        document.getElementById('canvas-w').addEventListener('input', e => canvas.style.width = e.target.value + 'mm');
+        document.getElementById('canvas-h').addEventListener('input', e => canvas.style.height = e.target.value + 'mm');
+        document.getElementById('toggle-grid').addEventListener('change', e => canvas.classList.toggle('show-grid', e.target.checked));
+        document.getElementById('toggle-ruler').addEventListener('change', e => container.classList.toggle('show-ruler', e.target.checked));
+        
+        const snapCheckbox = document.getElementById('toggle-snap');
+        const forceArialCheckbox = document.getElementById('force-arial');
+
+        // 绑定 Arial 字体强制切换
+        forceArialCheckbox.addEventListener('change', e => {
+            canvas.classList.toggle('force-arial', e.target.checked);
+        });
+
+        // ================= 1. 导入图形 =================
+        document.getElementById('file-upload').addEventListener('change', e => {
+            Array.from(e.target.files).forEach((file, idx) => {
+                const reader = new FileReader();
+                reader.onload = evt => injectToCanvas(evt.target.result, file.name, idx);
+                reader.readAsText(file);
+            });
+            e.target.value = '';
+        });
+
+        function injectToCanvas(svgString, filename, idx) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'svg-wrapper';
+            wrapper.dataset.filename = filename;
+            
+            let offset = (zIndexCounter % 10) * 20 + 20;
+            wrapper.style.left = offset + (idx * 20) + 'px';
+            wrapper.style.top = offset + (idx * 20) + 'px';
+            wrapper.style.zIndex = zIndexCounter++;
+            wrapper.innerHTML = svgString;
+
+            const svgEl = wrapper.querySelector('svg');
+            if(!svgEl) return;
+            
+            let origWidth = 300;
+            if (svgEl.getAttribute('viewBox')) origWidth = parseFloat(svgEl.getAttribute('viewBox').split(/[ ,]+/)[2]);
+            else if (svgEl.getAttribute('width')) origWidth = parseFloat(svgEl.getAttribute('width'));
+            
+            wrapper.dataset.origWidth = origWidth;
+            wrapper.style.width = '300px'; 
+            wrapper.style.height = 'auto';
+
+            const handle = document.createElement('div'); handle.className = 'resize-handle';
+            const del = document.createElement('div'); del.className = 'delete-btn'; del.innerHTML = '×';
+            del.onclick = (e) => { e.stopPropagation(); wrapper.remove(); closeInspector(); };
+            
+            wrapper.appendChild(handle); wrapper.appendChild(del);
+            canvas.appendChild(wrapper);
+            initDragAndResize(wrapper, handle);
+
+            wrapper.addEventListener('dblclick', (e) => { e.stopPropagation(); openInspector(wrapper); });
+        }
+
+        function colorToHex(colorStr) {
+            if (!colorStr || colorStr === 'none' || colorStr === 'transparent') return null;
+            const ctx = document.createElement('canvas').getContext('2d');
+            ctx.fillStyle = colorStr;
+            return ctx.fillStyle;
+        }
+
+        // ================= 2. 富文本解析算法 (HTML <-> SVG) =================
+        function parseSvgToHtml(svgTextHtml) {
+            let html = svgTextHtml;
+            html = html.replace(/<tspan[^>]*font-weight=["']bold["'][^>]*>(.*?)<\/tspan>/gi, '<b>$1</b>');
+            html = html.replace(/<tspan[^>]*font-style=["']italic["'][^>]*>(.*?)<\/tspan>/gi, '<i>$1</i>');
+            html = html.replace(/<tspan[^>]*text-decoration=["']underline["'][^>]*>(.*?)<\/tspan>/gi, '<u>$1</u>');
+            html = html.replace(/<tspan[^>]*>(.*?)<\/tspan>/gi, '$1');
+            return html;
+        }
+
+        function parseHtmlToSvg(htmlText) {
+            let svgStr = htmlText;
+            svgStr = svgStr.replace(/<b>(.*?)<\/b>/gi, '<tspan font-weight="bold">$1</tspan>');
+            svgStr = svgStr.replace(/<strong>(.*?)<\/strong>/gi, '<tspan font-weight="bold">$1</tspan>');
+            svgStr = svgStr.replace(/<i>(.*?)<\/i>/gi, '<tspan font-style="italic">$1</tspan>');
+            svgStr = svgStr.replace(/<em>(.*?)<\/em>/gi, '<tspan font-style="italic">$1</tspan>');
+            svgStr = svgStr.replace(/<u>(.*?)<\/u>/gi, '<tspan text-decoration="underline">$1</tspan>');
+            
+            svgStr = svgStr.replace(/<div[^>]*>/gi, ' ').replace(/<\/div>/gi, '');
+            svgStr = svgStr.replace(/<br\s*\/?>/gi, ' ');
+            svgStr = svgStr.replace(/<span[^>]*>(.*?)<\/span>/gi, '$1');
+            return svgStr;
+        }
+
+        // ================= 3. 属性检查器 (解析与渲染) =================
+        const inspectorPanel = document.getElementById('inspector');
+        const fontListDiv = document.getElementById('font-list');
+        const colorListDiv = document.getElementById('color-list');
+        const textListDiv = document.getElementById('text-editor-list');
+
+        function closeInspector() { inspectorPanel.classList.remove('open'); activeEditWrapper = null; }
+
+        function openInspector(wrapper) {
+            activeEditWrapper = wrapper;
+            const svgEl = wrapper.querySelector('svg');
+            const scale = wrapper.getBoundingClientRect().width / parseFloat(wrapper.dataset.origWidth);
+
+            let fontsMap = new Map();
+            svgEl.querySelectorAll('text, tspan').forEach(node => {
+                let sizeStr = node.style.fontSize || node.getAttribute('font-size');
+                if (sizeStr) {
+                    let internalSize = parseFloat(sizeStr);
+                    if (!isNaN(internalSize)) {
+                        let visualSize = Math.round((internalSize * scale) * 10) / 10;
+                        if(!fontsMap.has(visualSize)) fontsMap.set(visualSize, []);
+                        fontsMap.get(visualSize).push({node: node, orig: internalSize});
+                    }
+                }
+            });
+
+            let colorsMap = new Map();
+            svgEl.querySelectorAll('*').forEach(node => {
+                const fill = node.getAttribute('fill') || node.style.fill;
+                const stroke = node.getAttribute('stroke') || node.style.stroke;
+                [ {c: fill, t: 'fill'}, {c: stroke, t: 'stroke'} ].forEach(item => {
+                    const hex = colorToHex(item.c);
+                    if (hex) {
+                        if (!colorsMap.has(hex)) colorsMap.set(hex, []);
+                        colorsMap.get(hex).push({ node: node, type: item.t });
+                    }
+                });
+            });
+
+            let textNodes = Array.from(svgEl.querySelectorAll('text'));
+
+            renderInspectorUI(fontsMap, colorsMap, textNodes, scale);
+            inspectorPanel.classList.add('open');
+        }
+
+        function renderInspectorUI(fontsMap, colorsMap, textNodes, scale) {
+            fontListDiv.innerHTML = ''; colorListDiv.innerHTML = ''; textListDiv.innerHTML = '';
+
+            // --- 渲染字体大小 ---
+            Array.from(fontsMap.keys()).sort((a,b)=>a-b).forEach(visualSize => {
+                const row = document.createElement('div');
+                row.className = 'prop-item';
+                row.innerHTML = `
+                    <span>字号</span>
+                    <div style="display:flex;align-items:center;">
+                        <input type="number" step="0.5" value="${visualSize}"> <span style="color:#888; margin-left:3px;">pt</span>
+                        <button class="btn-icon" title="在图中闪烁定位">💡</button>
+                    </div>
+                `;
+                
+                row.querySelector('input').addEventListener('input', (e) => {
+                    const newVisualSize = parseFloat(e.target.value);
+                    if(isNaN(newVisualSize)) return;
+                    const newInternalSize = newVisualSize / scale;
+                    fontsMap.get(visualSize).forEach(item => {
+                        item.node.setAttribute('font-size', `${newInternalSize}px`);
+                        item.node.style.fontSize = `${newInternalSize}px`;
+                    });
+                });
+
+                row.querySelector('.btn-icon').addEventListener('click', () => {
+                    fontsMap.get(visualSize).forEach(item => {
+                        item.node.classList.remove('highlight-blink');
+                        void item.node.offsetWidth;
+                        item.node.classList.add('highlight-blink');
+                        setTimeout(() => item.node.classList.remove('highlight-blink'), 3000);
+                    });
+                });
+
+                fontListDiv.appendChild(row);
+            });
+
+            // --- 渲染颜色 ---
+            Array.from(colorsMap.keys()).forEach(hexStr => {
+                const row = document.createElement('div');
+                row.className = 'prop-item';
+                row.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <input type="color" value="${hexStr}">
+                        <span style="font-family:monospace;font-size:12px;color:#555;">${hexStr.toUpperCase()}</span>
+                    </div>
+                `;
+                row.querySelector('input').addEventListener('input', (e) => {
+                    const newColor = e.target.value;
+                    row.querySelector('span').innerText = newColor.toUpperCase();
+                    colorsMap.get(hexStr).forEach(item => {
+                        if (item.type === 'fill') {
+                            if (item.node.hasAttribute('fill')) item.node.setAttribute('fill', newColor);
+                            if (item.node.style.fill) item.node.style.fill = newColor;
+                        } else {
+                            if (item.node.hasAttribute('stroke')) item.node.setAttribute('stroke', newColor);
+                            if (item.node.style.stroke) item.node.style.stroke = newColor;
+                        }
+                    });
+                });
+                colorListDiv.appendChild(row);
+            });
+
+            // --- 渲染富文本编辑器 ---
+            if (textNodes.length === 0) {
+                textListDiv.innerHTML = '<span style="color:#999;font-size:12px;">未检测到可编辑文本</span>';
+                return;
+            }
+
+            textNodes.forEach((node, index) => {
+                const block = document.createElement('div');
+                block.className = 'text-editor-block';
+                
+                const initialHtml = parseSvgToHtml(node.innerHTML);
+
+                block.innerHTML = `
+                    <div class="text-toolbar">
+                        <button onclick="document.execCommand('bold', false, null)" style="font-weight:bold" title="加粗 (Ctrl+B)">B</button>
+                        <button onclick="document.execCommand('italic', false, null)" style="font-style:italic" title="斜体 (Ctrl+I)">I</button>
+                        <button onclick="document.execCommand('underline', false, null)" style="text-decoration:underline" title="下划线 (Ctrl+U)">U</button>
+                    </div>
+                    <div class="text-content-editable" contenteditable="true">${initialHtml}</div>
+                `;
+                
+                const editableDiv = block.querySelector('.text-content-editable');
+                
+                editableDiv.addEventListener('input', () => {
+                    const htmlContent = editableDiv.innerHTML;
+                    const finalSvgStr = parseHtmlToSvg(htmlContent);
+                    node.innerHTML = finalSvgStr;
+                });
+
+                textListDiv.appendChild(block);
+            });
+        }
+
+        // ================= 4. 拖拽与缩放 =================
+        function initDragAndResize(wrapper, handle) {
+            let isDragging = false, isResizing = false;
+            let startX, startY, startLeft, startTop, startWidth, ratio;
+
+            wrapper.addEventListener('mousedown', e => {
+                if (e.target === handle || e.target.classList.contains('delete-btn')) return;
+                isDragging = true; wrapper.style.zIndex = zIndexCounter++;
+                startX = e.clientX; startY = e.clientY;
+                startLeft = parseFloat(wrapper.style.left) || 0; startTop = parseFloat(wrapper.style.top) || 0;
+                document.querySelectorAll('.svg-wrapper').forEach(w => w.classList.remove('active'));
+                wrapper.classList.add('active');
+            });
+
+            handle.addEventListener('mousedown', e => {
+                isResizing = true; wrapper.style.zIndex = zIndexCounter++;
+                startX = e.clientX; startWidth = wrapper.getBoundingClientRect().width; 
+                ratio = startWidth / wrapper.getBoundingClientRect().height;
+                e.stopPropagation();
+            });
+
+            document.addEventListener('mousemove', e => {
+                const doSnap = snapCheckbox.checked;
+                if (isDragging) {
+                    let newLeft = startLeft + (e.clientX - startX);
+                    let newTop = startTop + (e.clientY - startY);
+                    if (doSnap) { newLeft = Math.round(newLeft / gridSize) * gridSize; newTop = Math.round(newTop / gridSize) * gridSize; }
+                    wrapper.style.left = newLeft + 'px'; wrapper.style.top = newTop + 'px';
+                }
+                if (isResizing) {
+                    let newWidth = startWidth + (e.clientX - startX);
+                    if (doSnap) newWidth = Math.round(newWidth / gridSize) * gridSize;
+                    if (newWidth < 50) newWidth = 50;
+                    wrapper.style.width = newWidth + 'px'; wrapper.style.height = (newWidth / ratio) + 'px';
+                    if(activeEditWrapper === wrapper) openInspector(wrapper);
+                }
+            });
+            document.addEventListener('mouseup', () => { isDragging = false; isResizing = false; });
+        }
+
+        canvas.addEventListener('mousedown', e => {
+            if (e.target === canvas) {
+                document.querySelectorAll('.svg-wrapper').forEach(w => w.classList.remove('active'));
+                closeInspector(); 
+            }
+        });
+
+        // ================= 5. 导出逻辑 =================
+        function triggerDownload(content, filename) {
+            const blob = new Blob([content], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('btn-export-combined').addEventListener('click', () => {
+            const canvasW = parseFloat(document.getElementById('canvas-w').value);
+            const canvasH = parseFloat(document.getElementById('canvas-h').value);
+            const pxW = canvasW * 3.78; const pxH = canvasH * 3.78;
+
+            let compositeSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}mm" height="${canvasH}mm" viewBox="0 0 ${pxW} ${pxH}">\n<rect width="100%" height="100%" fill="white"/>\n`;
+            
+            // 如果勾选强制 Arial 字体，插入相应的 style 声明
+            if (forceArialCheckbox.checked) {
+                compositeSvg += `<style>text, tspan, textPath { font-family: Arial, Helvetica, sans-serif !important; }</style>\n`;
+            }
+
+            document.querySelectorAll('.svg-wrapper').forEach(wrapper => {
+                const svgEl = wrapper.querySelector('svg');
+                if (!svgEl) return;
+                const cRect = canvas.getBoundingClientRect(); const wRect = wrapper.getBoundingClientRect();
+                const scaleX = pxW / cRect.width;
+                const finalX = (wRect.left - cRect.left) * scaleX; const finalY = (wRect.top - cRect.top) * scaleX;
+                const finalW = wRect.width * scaleX; const finalH = wRect.height * scaleX;
+                const viewBox = svgEl.getAttribute('viewBox') || `0 0 ${wrapper.dataset.origWidth} ${wrapper.dataset.origWidth}`;
+                
+                const cleanHtml = svgEl.innerHTML.replace(/class="[^"]*highlight-blink[^"]*"/g, '');
+                
+                compositeSvg += `<svg x="${finalX}" y="${finalY}" width="${finalW}" height="${finalH}" viewBox="${viewBox}">\n${cleanHtml}\n</svg>\n`;
+            });
+            compositeSvg += `</svg>`;
+            triggerDownload(compositeSvg, 'SCI_Composite_Figure.svg');
+        });
+
+        document.getElementById('btn-export-batch').addEventListener('click', () => {
+            const wrappers = document.querySelectorAll('.svg-wrapper');
+            if (wrappers.length === 0) return alert("画布上没有图片");
+
+            wrappers.forEach((wrapper, index) => {
+                const svgEl = wrapper.querySelector('svg');
+                if (!svgEl) return;
+                const clonedSvg = svgEl.cloneNode(true);
+                clonedSvg.querySelectorAll('.highlight-blink').forEach(el => el.classList.remove('highlight-blink'));
+                
+                // 如果勾选强制 Arial 字体，在单图内部植入样式
+                if (forceArialCheckbox.checked) {
+                    const styleTag = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+                    styleTag.textContent = 'text, tspan, textPath { font-family: Arial, Helvetica, sans-serif !important; }';
+                    clonedSvg.insertBefore(styleTag, clonedSvg.firstChild);
+                }
+
+                if (!clonedSvg.getAttribute('xmlns')) clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                let originalName = wrapper.dataset.filename || `figure_${index + 1}.svg`;
+                setTimeout(() => triggerDownload(clonedSvg.outerHTML, originalName.replace('.svg', '_modified.svg')), index * 300);
+            });
+        });
+    </script>
+</body>
+</html>

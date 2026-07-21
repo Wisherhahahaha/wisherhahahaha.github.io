@@ -22,3 +22,4 @@ order: 4
 - [取色器](/misc/color_picker.html)
 - [图像校正 - perspective变换](/misc/perspective.html)
 - [砸地鼠](/misc/whack-a-mole.html)
+- [SVG 组图工具](/misc/SVG_grouping_tool.html)
