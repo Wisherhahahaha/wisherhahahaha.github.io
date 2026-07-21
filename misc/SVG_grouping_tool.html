@@ -49,9 +49,28 @@
         .svg-wrapper:hover, .svg-wrapper.active { border-color: var(--primary-color); }
         .svg-wrapper svg { width: 100%; height: 100%; display: block; pointer-events: none; }
         
-        .resize-handle { position: absolute; width: 10px; height: 10px; background: var(--primary-color); bottom: -5px; right: -5px; cursor: se-resize; border-radius: 50%; display: none; }
-        .delete-btn { position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; background: #ff4d4f; color: white; border-radius: 50%; text-align: center; line-height: 18px; cursor: pointer; display: none; font-size: 12px; font-weight: bold; }
+        /* 右下角比例缩放手柄 */
+        .resize-handle { position: absolute; width: 10px; height: 10px; background: var(--primary-color); bottom: -5px; right: -5px; cursor: se-resize; border-radius: 50%; display: none; z-index: 20; }
+        .delete-btn { position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; background: #ff4d4f; color: white; border-radius: 50%; text-align: center; line-height: 18px; cursor: pointer; display: none; font-size: 12px; font-weight: bold; z-index: 25; }
         .svg-wrapper:hover .resize-handle, .svg-wrapper.active .resize-handle, .svg-wrapper:hover .delete-btn, .svg-wrapper.active .delete-btn { display: block; }
+
+        /* 四向无损边界拉伸触控条 */
+        .edge-handle { position: absolute; background: transparent; z-index: 15; }
+        .edge-handle.edge-t { top: -3px; left: 3px; right: 3px; height: 6px; cursor: n-resize; }
+        .edge-handle.edge-b { bottom: -3px; left: 3px; right: 3px; height: 6px; cursor: s-resize; }
+        .edge-handle.edge-l { left: -3px; top: 3px; bottom: 3px; width: 6px; cursor: w-resize; }
+        .edge-handle.edge-r { right: -3px; top: 3px; bottom: 3px; width: 6px; cursor: e-resize; }
+
+        /* 框选虚线框 */
+        .selection-box { position: absolute; border: 1px dashed var(--primary-color); background: rgba(24, 144, 255, 0.15); pointer-events: none; z-index: 9999; }
+
+        /* 选中的 SVG 文本框高亮样式 */
+        .selected-text-node {
+            filter: drop-shadow(0px 0px 3px var(--primary-color)) !important;
+            paint-order: stroke fill;
+            stroke: rgba(24, 144, 255, 0.8) !important;
+            stroke-width: 0.8px !important;
+        }
 
         /* 动画：灯泡闪烁定位 */
         @keyframes svg-blink {
@@ -75,7 +94,7 @@
         .prop-group { margin-bottom: 25px; }
         .prop-title { font-size: 13px; color: #888; text-transform: uppercase; margin-bottom: 10px; border-bottom: 1px dashed #eee; padding-bottom: 5px; font-weight: bold;}
         .prop-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px;}
-        .prop-item input[type="number"] { width: 60px; }
+        .prop-item input[type="number"] { width: 70px; }
         .prop-item input[type="color"] { width: 30px; height: 30px; padding: 0; border: none; cursor: pointer; background: none; }
         
         .btn-icon { background: none; border: 1px solid #ccc; cursor: pointer; border-radius: 4px; padding: 2px 6px; margin-left: 5px; font-size: 14px;}
@@ -94,7 +113,9 @@
 
     <div class="sidebar">
         <h2 style="margin-bottom: 0;">SVG 组图工具</h2>
-        <p style="font-size:12px; color:#666; margin-top:5px;">💡 双击图片开启字体、颜色、文本编辑。</p>
+        <p style="font-size:12px; color:#666; margin-top:5px;">💡 在画布空白处拖拽鼠标可框选图内多个文本框。</p>
+        <p style="font-size:12px; color:#666; margin-top:5px;">💡 双击单图可以修改颜色和文本内容。</p>
+        <p style="font-size:12px; color:#666; margin-top:5px;">💡 单图可以调整边界大小（上下左右）和整体缩放（右下角）</p>
         
         <div class="section-title">1. 画布设置</div>
         <div class="row">
@@ -128,20 +149,30 @@
     <!-- 属性检查器面板 -->
     <div class="inspector-panel" id="inspector">
         <div class="inspector-header">
-            <h3>单图高级编辑</h3>
+            <h3 id="inspector-main-title">高级编辑控制台</h3>
             <button class="close-btn" onclick="closeInspector()">×</button>
         </div>
         <div class="inspector-body">
+            <!-- 单图边界画布大小修改（不缩放内容） -->
+            <div class="prop-group" id="canvas-resize-group" style="display:none;">
+                <div class="prop-title">单图画布边界调整 (不缩放内容)</div>
+                <div class="row">
+                    <label>宽度 (px):</label> <input type="number" id="img-canvas-w" step="10">
+                    <label>高度 (px):</label> <input type="number" id="img-canvas-h" step="10">
+                </div>
+                <p style="font-size:11px; color:#888; margin: 5px 0 0 0;">💡 调大此尺寸可给溢出边界的文本留出空间，不影响图形缩放比。</p>
+            </div>
+
             <div class="prop-group">
-                <div class="prop-title">字体大小 (批量修改)</div>
+                <div class="prop-title" id="font-group-title">字体大小 (批量修改)</div>
                 <div id="font-list"></div>
             </div>
             <div class="prop-group">
-                <div class="prop-title">颜色修改</div>
+                <div class="prop-title" id="color-group-title">颜色修改</div>
                 <div id="color-list"></div>
             </div>
             <div class="prop-group">
-                <div class="prop-title">文本编辑</div>
+                <div class="prop-title" id="text-group-title">文本编辑</div>
                 <div id="text-editor-list"></div>
             </div>
         </div>
@@ -153,6 +184,7 @@
         const gridSize = 20;
         let zIndexCounter = 10;
         let activeEditWrapper = null;
+        let selectedTextNodes = []; // 存储框选到的文本元素
 
         document.getElementById('canvas-w').addEventListener('input', e => canvas.style.width = e.target.value + 'mm');
         document.getElementById('canvas-h').addEventListener('input', e => canvas.style.height = e.target.value + 'mm');
@@ -162,7 +194,6 @@
         const snapCheckbox = document.getElementById('toggle-snap');
         const forceArialCheckbox = document.getElementById('force-arial');
 
-        // 绑定 Arial 字体强制切换
         forceArialCheckbox.addEventListener('change', e => {
             canvas.classList.toggle('force-arial', e.target.checked);
         });
@@ -199,13 +230,32 @@
             wrapper.style.width = '300px'; 
             wrapper.style.height = 'auto';
 
+            // 右下角等比缩放手柄与删除按钮
             const handle = document.createElement('div'); handle.className = 'resize-handle';
             const del = document.createElement('div'); del.className = 'delete-btn'; del.innerHTML = '×';
             del.onclick = (e) => { e.stopPropagation(); wrapper.remove(); closeInspector(); };
             
             wrapper.appendChild(handle); wrapper.appendChild(del);
+
+            // 植入上、下、左、右四个方向的边界微调手柄
+            const edgeT = document.createElement('div'); edgeT.className = 'edge-handle edge-t';
+            const edgeB = document.createElement('div'); edgeB.className = 'edge-handle edge-b';
+            const edgeL = document.createElement('div'); edgeL.className = 'edge-handle edge-l';
+            const edgeR = document.createElement('div'); edgeR.className = 'edge-handle edge-r';
+            
+            wrapper.appendChild(edgeT);
+            wrapper.appendChild(edgeB);
+            wrapper.appendChild(edgeL);
+            wrapper.appendChild(edgeR);
+
             canvas.appendChild(wrapper);
             initDragAndResize(wrapper, handle);
+
+            // 初始化四向拉伸交互
+            initEdgeResize(wrapper, edgeT, 't');
+            initEdgeResize(wrapper, edgeB, 'b');
+            initEdgeResize(wrapper, edgeL, 'l');
+            initEdgeResize(wrapper, edgeR, 'r');
 
             wrapper.addEventListener('dblclick', (e) => { e.stopPropagation(); openInspector(wrapper); });
         }
@@ -217,7 +267,7 @@
             return ctx.fillStyle;
         }
 
-        // ================= 2. 富文本解析算法 (HTML <-> SVG) =================
+        // ================= 2. 富文本解析与单图边界微调算法 =================
         function parseSvgToHtml(svgTextHtml) {
             let html = svgTextHtml;
             html = html.replace(/<tspan[^>]*font-weight=["']bold["'][^>]*>(.*?)<\/tspan>/gi, '<b>$1</b>');
@@ -241,18 +291,188 @@
             return svgStr;
         }
 
-        // ================= 3. 属性检查器 (解析与渲染) =================
+        // 高级四向非等比拉伸功能（只改变 viewBox 和容器位置，内容不进行缩放）
+        function initEdgeResize(wrapper, edgeEl, direction) {
+            let startX, startY, startLeft, startTop, startWidth, startHeight;
+            let minX, minY, vbW, vbH, scale;
+
+            edgeEl.addEventListener('mousedown', e => {
+                e.stopPropagation();
+                e.preventDefault();
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = parseFloat(wrapper.style.left) || 0;
+                startTop = parseFloat(wrapper.style.top) || 0;
+                startWidth = wrapper.getBoundingClientRect().width;
+                startHeight = wrapper.getBoundingClientRect().height;
+
+                const svgEl = wrapper.querySelector('svg');
+                if (svgEl) {
+                    let vb = svgEl.getAttribute('viewBox');
+                    let origW = parseFloat(wrapper.dataset.origWidth) || startWidth;
+                    minX = 0; minY = 0; vbW = origW; vbH = (startHeight / startWidth) * origW;
+                    if (vb) {
+                        const parts = vb.split(/[ ,]+/).map(Number);
+                        if (parts.length === 4) {
+                            [minX, minY, vbW, vbH] = parts;
+                        }
+                    }
+                    scale = startWidth / vbW; // 像素到内部 viewBox 的比例换算 (1 viewBox unit = scale pixels)
+                }
+
+                function onMouseMove(moveEv) {
+                    const deltaX = moveEv.clientX - startX;
+                    const deltaY = moveEv.clientY - startY;
+                    const svgEl = wrapper.querySelector('svg');
+                    if (!svgEl || !scale) return;
+
+                    let newLeft = startLeft;
+                    let newTop = startTop;
+                    let newWidth = startWidth;
+                    let newHeight = startHeight;
+                    let newMinX = minX;
+                    let newMinY = minY;
+
+                    if (direction.includes('r')) {
+                        newWidth = startWidth + deltaX;
+                    }
+                    if (direction.includes('l')) {
+                        newWidth = startWidth - deltaX;
+                        newLeft = startLeft + deltaX;
+                        newMinX = minX + (deltaX / scale); 
+                    }
+                    if (direction.includes('b')) {
+                        newHeight = startHeight + deltaY;
+                    }
+                    if (direction.includes('t')) {
+                        newHeight = startHeight - deltaY;
+                        newTop = startTop + deltaY;
+                        newMinY = minY + (deltaY / scale); 
+                    }
+
+                    // 最小尺寸约束
+                    if (newWidth < 50) {
+                        if (direction.includes('l')) {
+                            newLeft = startLeft + (startWidth - 50);
+                            newMinX = minX + ((startWidth - 50) / scale);
+                        }
+                        newWidth = 50;
+                    }
+                    if (newHeight < 30) {
+                        if (direction.includes('t')) {
+                            newTop = startTop + (startHeight - 30);
+                            newMinY = minY + ((startHeight - 30) / scale);
+                        }
+                        newHeight = 30;
+                    }
+
+                    wrapper.style.left = newLeft + 'px';
+                    wrapper.style.top = newTop + 'px';
+                    wrapper.style.width = newWidth + 'px';
+                    wrapper.style.height = newHeight + 'px';
+
+                    const newVbW = newWidth / scale;
+                    const newVbH = newHeight / scale;
+                    svgEl.setAttribute('viewBox', `${newMinX} ${newMinY} ${newVbW} ${newVbH}`);
+                    
+                    // 同步到单图面板中
+                    const imgWInput = document.getElementById('img-canvas-w');
+                    const imgHInput = document.getElementById('img-canvas-h');
+                    if (activeEditWrapper === wrapper && imgWInput && imgHInput) {
+                        imgWInput.value = Math.round(newWidth);
+                        imgHInput.value = Math.round(newHeight);
+                    }
+                }
+
+                // 松开鼠标，解除事件绑定
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        // 原单图边界属性调整
+        function adjustSvgCanvasSize(wrapper, newWidth, newHeight) {
+            const svgEl = wrapper.querySelector('svg');
+            if (!svgEl) return;
+            
+            let vb = svgEl.getAttribute('viewBox');
+            let minX = 0, minY = 0;
+            let currentWidth = wrapper.getBoundingClientRect().width;
+            let currentHeight = wrapper.getBoundingClientRect().height;
+            
+            let origW = parseFloat(wrapper.dataset.origWidth) || currentWidth;
+            let vbW = origW;
+            let vbH = (currentHeight / currentWidth) * origW;
+            
+            if (vb) {
+                const parts = vb.split(/[ ,]+/).map(Number);
+                if (parts.length === 4) {
+                    minX = parts[0]; minY = parts[1]; vbW = parts[2]; vbH = parts[3];
+                }
+            }
+
+            const scaleX = currentWidth / vbW;
+            const scaleY = currentHeight / vbH;
+
+            const newVbW = newWidth / scaleX;
+            const newVbH = newHeight / scaleY;
+
+            wrapper.style.width = newWidth + 'px';
+            wrapper.style.height = newHeight + 'px';
+            svgEl.setAttribute('viewBox', `${minX} ${minY} ${newVbW} ${newVbH}`);
+        }
+
+        // 清理文本框高亮状态
+        function clearTextSelection() {
+            selectedTextNodes.forEach(node => {
+                node.classList.remove('selected-text-node');
+            });
+            selectedTextNodes = [];
+        }
+
+        // ================= 3. 属性检查器 (单图与批量多图编辑) =================
         const inspectorPanel = document.getElementById('inspector');
         const fontListDiv = document.getElementById('font-list');
         const colorListDiv = document.getElementById('color-list');
         const textListDiv = document.getElementById('text-editor-list');
 
-        function closeInspector() { inspectorPanel.classList.remove('open'); activeEditWrapper = null; }
+        function closeInspector() { 
+            inspectorPanel.classList.remove('open'); 
+            activeEditWrapper = null; 
+            clearTextSelection();
+        }
 
+        // 单图面板
         function openInspector(wrapper) {
+            clearTextSelection();
             activeEditWrapper = wrapper;
             const svgEl = wrapper.querySelector('svg');
             const scale = wrapper.getBoundingClientRect().width / parseFloat(wrapper.dataset.origWidth);
+
+            document.getElementById('inspector-main-title').innerText = "单图高级编辑";
+            document.getElementById('canvas-resize-group').style.display = 'block';
+            document.getElementById('font-group-title').innerText = "字体大小 (批量修改)";
+            document.getElementById('color-group-title').innerText = "颜色修改";
+            document.getElementById('text-group-title').innerText = "文本编辑";
+
+            const imgWInput = document.getElementById('img-canvas-w');
+            const imgHInput = document.getElementById('img-canvas-h');
+            imgWInput.value = Math.round(wrapper.getBoundingClientRect().width);
+            imgHInput.value = Math.round(wrapper.getBoundingClientRect().height);
+
+            imgWInput.oninput = (e) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val)) adjustSvgCanvasSize(wrapper, val, parseFloat(imgHInput.value));
+            };
+            imgHInput.oninput = (e) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val)) adjustSvgCanvasSize(wrapper, parseFloat(imgWInput.value), val);
+            };
 
             let fontsMap = new Map();
             svgEl.querySelectorAll('text, tspan').forEach(node => {
@@ -382,18 +602,107 @@
             });
         }
 
-        // ================= 4. 拖拽与缩放 =================
+        // 批量文本编辑面板 UI
+        function openTextNodesInspector(nodes) {
+            activeEditWrapper = null;
+            fontListDiv.innerHTML = '';
+            colorListDiv.innerHTML = '';
+            textListDiv.innerHTML = '';
+
+            document.getElementById('inspector-main-title').innerText = "选中文本批量编辑";
+            document.getElementById('canvas-resize-group').style.display = 'none';
+            document.getElementById('font-group-title').innerText = "批量字号";
+            document.getElementById('color-group-title').innerText = "批量填充颜色";
+            document.getElementById('text-group-title').innerText = "已选文本列表";
+
+            // 批量字号修改
+            const fontRow = document.createElement('div');
+            fontRow.className = 'prop-item';
+            fontRow.innerHTML = `
+                <span>统一字号大小</span>
+                <div style="display:flex;align-items:center;">
+                    <input type="number" id="batch-text-font-val" step="0.5" value="12" style="width:55px;"> <span style="color:#888; margin-left:3px;">pt</span>
+                    <button id="btn-apply-text-font" class="btn-icon" style="background:var(--primary-color); color:white; border:none; padding:4px 10px; margin-left:8px; border-radius:3px;">应用</button>
+                </div>
+            `;
+            fontRow.querySelector('#btn-apply-text-font').addEventListener('click', () => {
+                const val = parseFloat(document.getElementById('batch-text-font-val').value);
+                if (!isNaN(val)) {
+                    nodes.forEach(node => {
+                        const wrapper = node.closest('.svg-wrapper');
+                        if (wrapper) {
+                            const scale = wrapper.getBoundingClientRect().width / parseFloat(wrapper.dataset.origWidth);
+                            const newInternalSize = val / scale;
+                            node.setAttribute('font-size', `${newInternalSize}px`);
+                            node.style.fontSize = `${newInternalSize}px`;
+                        }
+                    });
+                }
+            });
+            fontListDiv.appendChild(fontRow);
+
+            // 批量文本颜色修改
+            const colorRow = document.createElement('div');
+            colorRow.className = 'prop-item';
+            colorRow.innerHTML = `
+                <span>文本填充颜色</span>
+                <div style="display:flex;align-items:center;">
+                    <input type="color" id="batch-text-color-val" value="#000000">
+                    <button id="btn-apply-text-color" class="btn-icon" style="background:var(--primary-color); color:white; border:none; padding:4px 10px; margin-left:8px; border-radius:3px;">应用</button>
+                </div>
+            `;
+            colorRow.querySelector('#btn-apply-text-color').addEventListener('click', () => {
+                const colorVal = document.getElementById('batch-text-color-val').value;
+                nodes.forEach(node => {
+                    node.setAttribute('fill', colorVal);
+                    node.style.fill = colorVal;
+                });
+            });
+            colorListDiv.appendChild(colorRow);
+
+            // 显示选中列表前15条摘要
+            const listBlock = document.createElement('div');
+            listBlock.style.fontSize = '12px';
+            listBlock.style.color = '#555';
+            listBlock.innerHTML = `<p style="margin-top:0;">共选中了 <b>${nodes.length}</b> 个文本框元素：</p>`;
+            
+            const ul = document.createElement('ul');
+            ul.style.paddingLeft = '15px'; ul.style.margin = '0'; ul.style.maxHeight = '180px'; ul.style.overflowY = 'auto';
+            
+            nodes.slice(0, 15).forEach(node => {
+                const li = document.createElement('li');
+                li.style.marginBottom = '4px';
+                li.innerText = node.textContent.trim().substring(0, 20) || "(无文字或包含子标签)";
+                ul.appendChild(li);
+            });
+            if (nodes.length > 15) {
+                const li = document.createElement('li');
+                li.innerText = `... 等共计 ${nodes.length} 项`;
+                ul.appendChild(li);
+            }
+            listBlock.appendChild(ul);
+            textListDiv.appendChild(listBlock);
+
+            inspectorPanel.classList.add('open');
+        }
+
+        // ================= 4. 拖拽、缩放与矩形框选 =================
         function initDragAndResize(wrapper, handle) {
             let isDragging = false, isResizing = false;
             let startX, startY, startLeft, startTop, startWidth, ratio;
 
             wrapper.addEventListener('mousedown', e => {
-                if (e.target === handle || e.target.classList.contains('delete-btn')) return;
+                // 如果点击了边缘手柄、删除按钮或缩放手柄，不启动容器拖拽
+                if (e.target.classList.contains('edge-handle') || e.target === handle || e.target.classList.contains('delete-btn')) return;
+                
                 isDragging = true; wrapper.style.zIndex = zIndexCounter++;
                 startX = e.clientX; startY = e.clientY;
                 startLeft = parseFloat(wrapper.style.left) || 0; startTop = parseFloat(wrapper.style.top) || 0;
-                document.querySelectorAll('.svg-wrapper').forEach(w => w.classList.remove('active'));
-                wrapper.classList.add('active');
+                
+                if (!wrapper.classList.contains('active')) {
+                    document.querySelectorAll('.svg-wrapper').forEach(w => w.classList.remove('active'));
+                    wrapper.classList.add('active');
+                }
             });
 
             handle.addEventListener('mousedown', e => {
@@ -422,12 +731,79 @@
             document.addEventListener('mouseup', () => { isDragging = false; isResizing = false; });
         }
 
+        // 鼠标拖拽框选：检测并框选文本框
         canvas.addEventListener('mousedown', e => {
             if (e.target === canvas) {
+                // 清空选中状态
                 document.querySelectorAll('.svg-wrapper').forEach(w => w.classList.remove('active'));
-                closeInspector(); 
+                clearTextSelection();
+                closeInspector();
+
+                const rect = canvas.getBoundingClientRect();
+                const startX = e.clientX - rect.left;
+                const startY = e.clientY - rect.top;
+
+                const selBox = document.createElement('div');
+                selBox.className = 'selection-box';
+                selBox.style.left = startX + 'px';
+                selBox.style.top = startY + 'px';
+                selBox.style.width = '0px';
+                selBox.style.height = '0px';
+                canvas.appendChild(selBox);
+
+                function onMouseMove(moveEv) {
+                    const curX = moveEv.clientX - rect.left;
+                    const curY = moveEv.clientY - rect.top;
+
+                    const left = Math.min(startX, curX);
+                    const top = Math.min(startY, curY);
+                    const width = Math.abs(startX - curX);
+                    const height = Math.abs(startY - curY);
+
+                    selBox.style.left = left + 'px';
+                    selBox.style.top = top + 'px';
+                    selBox.style.width = width + 'px';
+                    selBox.style.height = height + 'px';
+
+                    // 检索并高亮区域内的所有文本节点(text, tspan)
+                    selectedTextNodes = [];
+                    document.querySelectorAll('.svg-wrapper svg text, .svg-wrapper svg tspan').forEach(node => {
+                        if (isIntersecting(selBox, node)) {
+                            node.classList.add('selected-text-node');
+                            selectedTextNodes.push(node);
+                        } else {
+                            node.classList.remove('selected-text-node');
+                        }
+                    });
+                }
+
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                    selBox.remove();
+
+                    // 如果框选了文本，展示批量文本编辑界面
+                    if (selectedTextNodes.length > 0) {
+                        openTextNodesInspector(selectedTextNodes);
+                    } else {
+                        closeInspector();
+                    }
+                }
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
             }
         });
+
+        // 基于 DOM 视口矩形精准碰撞检测
+        function isIntersecting(box, element) {
+            const rectB = box.getBoundingClientRect();
+            const rectE = element.getBoundingClientRect();
+            return !(rectB.right < rectE.left || 
+                     rectB.left > rectE.right || 
+                     rectB.bottom < rectE.top || 
+                     rectB.top > rectE.bottom);
+        }
 
         // ================= 5. 导出逻辑 =================
         function triggerDownload(content, filename) {
@@ -445,7 +821,6 @@
 
             let compositeSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasW}mm" height="${canvasH}mm" viewBox="0 0 ${pxW} ${pxH}">\n<rect width="100%" height="100%" fill="white"/>\n`;
             
-            // 如果勾选强制 Arial 字体，插入相应的 style 声明
             if (forceArialCheckbox.checked) {
                 compositeSvg += `<style>text, tspan, textPath { font-family: Arial, Helvetica, sans-serif !important; }</style>\n`;
             }
@@ -459,7 +834,10 @@
                 const finalW = wRect.width * scaleX; const finalH = wRect.height * scaleX;
                 const viewBox = svgEl.getAttribute('viewBox') || `0 0 ${wrapper.dataset.origWidth} ${wrapper.dataset.origWidth}`;
                 
-                const cleanHtml = svgEl.innerHTML.replace(/class="[^"]*highlight-blink[^"]*"/g, '');
+                // 去除高亮和闪烁样式类再进行拼接
+                let cleanHtml = svgEl.innerHTML
+                    .replace(/class="[^"]*highlight-blink[^"]*"/g, '')
+                    .replace(/class="[^"]*selected-text-node[^"]*"/g, '');
                 
                 compositeSvg += `<svg x="${finalX}" y="${finalY}" width="${finalW}" height="${finalH}" viewBox="${viewBox}">\n${cleanHtml}\n</svg>\n`;
             });
@@ -475,9 +853,11 @@
                 const svgEl = wrapper.querySelector('svg');
                 if (!svgEl) return;
                 const clonedSvg = svgEl.cloneNode(true);
-                clonedSvg.querySelectorAll('.highlight-blink').forEach(el => el.classList.remove('highlight-blink'));
                 
-                // 如果勾选强制 Arial 字体，在单图内部植入样式
+                // 清理所有可能导出的多余临时样式
+                clonedSvg.querySelectorAll('.highlight-blink').forEach(el => el.classList.remove('highlight-blink'));
+                clonedSvg.querySelectorAll('.selected-text-node').forEach(el => el.classList.remove('selected-text-node'));
+                
                 if (forceArialCheckbox.checked) {
                     const styleTag = document.createElementNS('http://www.w3.org/2000/svg', 'style');
                     styleTag.textContent = 'text, tspan, textPath { font-family: Arial, Helvetica, sans-serif !important; }';
