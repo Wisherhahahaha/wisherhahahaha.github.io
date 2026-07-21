@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     
-    <title>SVG 组图排版工具</title>
+    <title>SVG 组图排版工具 (安全及暂存优化版)</title>
     <style>
         :root {
             --bg-color: #f0f2f5; --panel-bg: #ffffff; --border-color: #d9d9d9;
@@ -126,7 +126,7 @@
     <div class="sidebar">
         <h2 style="margin-bottom: 0; font-size: 18px;">SVG 矢量及图片组图排版</h2>
         <p style="font-size:12px; color:#666; margin-top:5px; line-height: 1.4;">
-            💡 <b>修改颜色和文本</b>：双击导入的小图，可以批量修改字体大小和颜色。也可以逐个修改文本内容和格式。<br>
+            💡 <b>多格式支持</b>：直接添加或拖入 SVG 矢量文件，以及 PNG、JPG、JPEG 图片，支持混合排版。<br>
             💡 <b>框选与标注</b>：在画布或网格空白处拖拽，可框选批量修改字号。点击网格单元可编辑角标。
         </p>
         
@@ -221,6 +221,13 @@
                 <div class="prop-title" id="font-group-title">字体大小 (批量修改)</div>
                 <div id="font-list"></div>
             </div>
+            
+            <!-- 新增：线宽控制组 -->
+            <div class="prop-group" id="stroke-group-box" style="display:none;">
+                <div class="prop-title">线宽粗细 (批量修改)</div>
+                <div id="stroke-list"></div>
+            </div>
+
             <div class="prop-group">
                 <div class="prop-title" id="color-group-title">颜色修改</div>
                 <div id="color-list"></div>
@@ -1047,6 +1054,7 @@
         const fontListDiv = document.getElementById('font-list');
         const colorListDiv = document.getElementById('color-list');
         const textListDiv = document.getElementById('text-editor-list');
+        const strokeListDiv = document.getElementById('stroke-list');
 
         function closeInspector() { 
             inspectorPanel.classList.remove('open'); 
@@ -1063,6 +1071,7 @@
 
             document.getElementById('inspector-main-title').innerText = "单元格属性";
             document.getElementById('canvas-resize-group').style.display = 'none';
+            document.getElementById('stroke-group-box').style.display = 'none';
             document.getElementById('font-group-title').innerText = "网格字母标注";
             document.getElementById('color-group-title').innerText = "网格信息";
             document.getElementById('text-group-title').innerText = "排版对齐";
@@ -1110,6 +1119,7 @@
 
             document.getElementById('inspector-main-title').innerText = "单图高级编辑";
             document.getElementById('canvas-resize-group').style.display = 'block';
+            document.getElementById('stroke-group-box').style.display = 'block';
             document.getElementById('font-group-title').innerText = "字体大小 (批量修改)";
             document.getElementById('color-group-title').innerText = "颜色修改";
             document.getElementById('text-group-title').innerText = "文本编辑";
@@ -1128,6 +1138,7 @@
                 if (!isNaN(val)) adjustSvgCanvasSize(wrapper, parseFloat(imgWInput.value), val);
             };
 
+            // 1. 字体分析
             let fontsMap = new Map();
             svgEl.querySelectorAll('text, tspan').forEach(node => {
                 let sizeStr = node.style.fontSize || node.getAttribute('font-size');
@@ -1141,6 +1152,28 @@
                 }
             });
 
+            // 2. 线宽分析 (过滤无描边元素)
+            let strokesMap = new Map();
+            svgEl.querySelectorAll('*').forEach(node => {
+                const tagName = node.tagName.toLowerCase();
+                if (tagName === 'g' || tagName === 'svg' || tagName === 'defs' || tagName === 'style') return;
+
+                const stroke = node.getAttribute('stroke') || node.style.stroke;
+                if (stroke && stroke !== 'none') {
+                    let strokeWStr = node.getAttribute('stroke-width') || node.style.strokeWidth;
+                    let internalW = parseFloat(strokeWStr);
+                    if (isNaN(internalW)) {
+                        internalW = 1.0; // 默认 SVG 线宽
+                    }
+                    let key = Math.round(internalW * 100) / 100;
+                    if (!strokesMap.has(key)) {
+                        strokesMap.set(key, []);
+                    }
+                    strokesMap.get(key).push(node);
+                }
+            });
+
+            // 3. 颜色分析
             let colorsMap = new Map();
             svgEl.querySelectorAll('*').forEach(node => {
                 const fill = node.getAttribute('fill') || node.style.fill;
@@ -1156,13 +1189,14 @@
 
             let textNodes = Array.from(svgEl.querySelectorAll('text'));
 
-            renderInspectorUI(fontsMap, colorsMap, textNodes, scale);
+            renderInspectorUI(fontsMap, colorsMap, textNodes, strokesMap, scale);
             inspectorPanel.classList.add('open');
         }
 
-        function renderInspectorUI(fontsMap, colorsMap, textNodes, scale) {
-            fontListDiv.innerHTML = ''; colorListDiv.innerHTML = ''; textListDiv.innerHTML = '';
+        function renderInspectorUI(fontsMap, colorsMap, textNodes, strokesMap, scale) {
+            fontListDiv.innerHTML = ''; colorListDiv.innerHTML = ''; textListDiv.innerHTML = ''; strokeListDiv.innerHTML = '';
 
+            // 渲染字体调整列表
             Array.from(fontsMap.keys()).sort((a,b)=>a-b).forEach(visualSize => {
                 const row = document.createElement('div');
                 row.className = 'prop-item';
@@ -1196,6 +1230,64 @@
                 fontListDiv.appendChild(row);
             });
 
+            // 渲染线宽控制列表
+            if (strokesMap.size === 0) {
+                strokeListDiv.innerHTML = '<span style="color:#999;font-size:12px;padding: 5px 10px;display: block;">未检测到可调整的描边线条</span>';
+            } else {
+                Array.from(strokesMap.keys()).sort((a,b)=>a-b).forEach(origW => {
+                    const row = document.createElement('div');
+                    row.className = 'prop-item';
+                    row.style.flexDirection = 'column';
+                    row.style.alignItems = 'stretch';
+                    row.style.gap = '6px';
+                    row.style.padding = '8px 10px';
+                    
+                    row.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <span style="font-size: 13px;">原始级: <strong style="font-family: monospace;">${origW}</strong></span>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <input type="number" step="0.1" value="${origW}" style="width: 65px; padding: 2px 4px; border: 1px solid #ccc; border-radius: 4px;" class="stroke-input">
+                                <span style="font-size:12px; color:#666;">pt/px</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 5px; justify-content: flex-end; width: 100%;">
+                            <button class="btn-preset" data-val="0.5" style="padding: 2px 6px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 3px;">0.5 pt</button>
+                            <button class="btn-preset" data-val="1.0" style="padding: 2px 6px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 3px;">1.0 pt</button>
+                            <button class="btn-preset" data-val="1.5" style="padding: 2px 6px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 3px;">1.5 pt</button>
+                            <button class="btn-preset" data-val="2.0" style="padding: 2px 6px; font-size: 11px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 3px;">2.0 pt</button>
+                        </div>
+                    `;
+
+                    const input = row.querySelector('.stroke-input');
+                    const nodes = strokesMap.get(origW);
+
+                    const updateNodesStroke = (newVal) => {
+                        nodes.forEach(node => {
+                            node.setAttribute('stroke-width', newVal);
+                            node.style.strokeWidth = newVal;
+                        });
+                    };
+
+                    input.addEventListener('input', (e) => {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val) && val >= 0) {
+                            updateNodesStroke(val);
+                        }
+                    });
+
+                    row.querySelectorAll('.btn-preset').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const presetVal = parseFloat(btn.dataset.val);
+                            input.value = presetVal;
+                            updateNodesStroke(presetVal);
+                        });
+                    });
+
+                    strokeListDiv.appendChild(row);
+                });
+            }
+
+            // 渲染颜色列表
             Array.from(colorsMap.keys()).forEach(hexStr => {
                 const row = document.createElement('div');
                 row.className = 'prop-item';
@@ -1258,9 +1350,11 @@
             fontListDiv.innerHTML = '';
             colorListDiv.innerHTML = '';
             textListDiv.innerHTML = '';
+            strokeListDiv.innerHTML = '';
 
             document.getElementById('inspector-main-title').innerText = "选中文本批量编辑";
             document.getElementById('canvas-resize-group').style.display = 'none';
+            document.getElementById('stroke-group-box').style.display = 'none';
             document.getElementById('font-group-title').innerText = "批量字号";
             document.getElementById('color-group-title').innerText = "批量填充颜色";
             document.getElementById('text-group-title').innerText = "已选文本列表";
@@ -1377,7 +1471,7 @@
             document.addEventListener('mouseup', () => { isDragging = false; isResizing = false; });
         }
 
-        // 统一画布鼠标监听（包含排版网格的单击选择与拖拽模式下的框选）
+        // 统一画布鼠标监听（包含排版网格的单选与拖拽框选）
         canvas.addEventListener('mousedown', e => {
             const isCanvasBackground = e.target === canvas || 
                                        e.target.id === 'grid-layout-layer' || 
@@ -1386,7 +1480,6 @@
                                        
             if (!isCanvasBackground) return;
 
-            // 识别是否点击在特定网格单元上
             const clickedCellEl = e.target.closest('.grid-cell');
             let cellObj = null;
             if (clickedCellEl) {
@@ -1410,7 +1503,6 @@
                 if (dist > 5) {
                     if (!hasMoved) {
                         hasMoved = true;
-                        // 一旦识别为拖拽框选行为，清除网格的选择状态
                         layoutGrid.cells.forEach(c => c.selected = false);
                         renderGridLayout();
                         clearTextSelection();
@@ -1461,14 +1553,12 @@
                 }
 
                 if (hasMoved) {
-                    // 框选行为结束：如果有选中的文本节点，则打开批量控制台
                     if (selectedTextNodes.length > 0) {
                         openTextNodesInspector(selectedTextNodes);
                     } else {
                         closeInspector();
                     }
                 } else {
-                    // 无拖拽，判定为普通单击行为：切换网格单元的选中状态
                     if (cellObj) {
                         if (upEv.shiftKey || upEv.ctrlKey) {
                             cellObj.selected = !cellObj.selected;
@@ -1479,7 +1569,6 @@
                         renderGridLayout();
                         updateGridInspector();
                     } else {
-                        // 点击空白区域
                         layoutGrid.cells.forEach(c => c.selected = false);
                         renderGridLayout();
                         clearTextSelection();
