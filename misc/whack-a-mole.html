@@ -54,7 +54,7 @@
                     <input type="file" id="upload-mole" accept="image/*">
                 </label>
                 <label class="upload-btn" id="lbl-hammer">
-                    上传锤子贴纸
+                    上传猎手头像
                     <input type="file" id="upload-hammer" accept="image/*">
                 </label>
             </div>
@@ -63,7 +63,7 @@
                 <h3>🎮 游戏规则 🎮</h3>
                 <p><b>🦫 地鼠(P1)：</b>按 <span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span class="key">D</span> 探头。<br>👉 <i>探头1/3停留 <b id="ui-mole-delay">0.4秒</b>后 完全探头并加分，被砸眩晕 <span id="ui-mole-stun">1</span> 秒。</i></p>
                 <hr style="margin: 10px 0; border-top: 1px dashed #ccc;">
-                <p><b>🔨 猎人(P2)：</b>按 <span class="key">↑</span> <span class="key">←</span> <span class="key">↓</span> <span class="key">→</span> 挥锤。<br>👉 <i>砸下前摇需要 <b id="ui-hammer-swing">0.6秒</b>，到底瞬间才产生判定！砸中加 <span id="ui-hammer-score">5</span> 分。</i></p>
+                <p><b>🔨 猎人(P2)：</b>按 <span class="key">↑</span> <span class="key">←</span> <span class="key">↓</span> <span class="key">→</span> 挥锤。<br>👉 <i>下砸前摇需 <b id="ui-hammer-swing">0.45秒</b>，以指数幂次 <b id="ui-hammer-power">3.0</b> 高加速砸向非常底部，在最后 <b id="ui-hammer-decel">10%</b> 距离处急刹制动归零并判定！砸中加 <span id="ui-hammer-score">5</span> 分。</i></p>
             </div>
             <button class="btn" id="start-btn">开始游戏</button>
         </div>
@@ -81,19 +81,23 @@
             // 🦫 地鼠(P1) 相关参数
             moleSpeed: 500,              // 探头/缩回基础速度
             moleStunRetractMult: 2,      // 被砸晕后缩回速度的倍率 (相对于基础速度)
-            moleReadyDelay: 0.4,         // 探头1/3时，延迟多久(秒)后才完全探出并开始加分
+            moleReadyDelay: 0.35,         // 探头1/3时，延迟多久(秒)后才完全探出并开始加分
             molePartialOffset: 66,       // 探头1/3时的 yOffset 值 (100为完全缩回，0为完全探出)
             moleScoreInterval: 0.2,      // 开始加分后，每次加分的间隔时间(秒)
             moleScorePerTick: 1,         // 每次间隔加多少分
-            moleStunDuration: 1.2,       // 被砸中后的眩晕时间(秒)
-            moleHitboxOffset: 80,        // 判定区域高度: yOffset 小于该值(即探出足够高)才算被打中
+            moleStunDuration: 1,       // 被砸中后的眩晕时间(秒)
+            moleHitboxOffset: 88,        // 判定区域高度: yOffset 小于该值(即探出足够高)才算被打中
 
             // 🔨 猎人(P2) 锤子相关参数
-            hammerSwingTime: 0.38,        // 砸下前摇时间(秒)
-            hammerRecoverTime: 0.3,      // 砸到底后拔起的恢复时间(秒)
-            hammerScorePerHit: 5,        // 成功砸中一次加多少分
+            hammerSwingTime: 0.45,        // 砸下前摇时间(秒)
+            hammerRecoverTime: 0.42,      // 砸到底后拔起的恢复时间(秒)
+            hammerScorePerHit: 4,        // 成功砸中一次加多少分
             hammerStartAngle: Math.PI/4, // 锤子初始/待机角度
-            hammerEndAngle: -0.2         // 锤子砸底时的角度
+            hammerEndAngle: -0.35,        // 锤子砸底时的角度 (微调到-0.35使其压得更低、更到非常底部)
+            
+            // 🚀 曲线物理引擎控制参数
+            hammerSwingPower: 5.5,        // 砸下加速指数 (数值越大，前期蓄力越久，中后期瞬时速度与加速度越大)
+            hammerSwingDecelStart: 0.90   // 制动减速区间起点。例如0.90代表在前90%时间内持续加速到v_max，最后10%时间内速度极速制动归0
         };
 
         // 自动将配置同步更新到 UI 文本（保持界面和参数一致）
@@ -101,6 +105,8 @@
         document.getElementById('ui-mole-delay').innerText = GAME_CONFIG.moleReadyDelay + "秒";
         document.getElementById('ui-mole-stun').innerText = GAME_CONFIG.moleStunDuration;
         document.getElementById('ui-hammer-swing').innerText = GAME_CONFIG.hammerSwingTime + "秒";
+        document.getElementById('ui-hammer-power').innerText = GAME_CONFIG.hammerSwingPower.toFixed(1);
+        document.getElementById('ui-hammer-decel').innerText = Math.round((1 - GAME_CONFIG.hammerSwingDecelStart) * 100) + "%";
         document.getElementById('ui-hammer-score').innerText = GAME_CONFIG.hammerScorePerHit;
         /** ========================================== */
 
@@ -181,6 +187,7 @@
             activeIdx: -1,
             angle: GAME_CONFIG.hammerStartAngle,
             state: 'IDLE',
+            time: 0,
             hasHit: false
         };
 
@@ -214,7 +221,6 @@
                         mole.state = 'FALLING';
                     }
                 } else {
-                    // 当松开按键时，无论处于升起的哪个阶段，都进入下降状态
                     if (['RISING', 'DELAY', 'RISING_FULL', 'UP'].includes(mole.state)) {
                         mole.state = 'FALLING';
                     }
@@ -227,6 +233,7 @@
                     if (keysDown[holes[i].keyMap.hammer]) {
                         hammer.activeIdx = i;
                         hammer.state = 'SWING_DOWN';
+                        hammer.time = 0;
                         hammer.angle = GAME_CONFIG.hammerStartAngle;
                         hammer.hasHit = false;
                         AudioSys.swing();
@@ -242,7 +249,7 @@
             updateHUD();
             document.getElementById('ui-layer').style.display = 'none';
             mole.state = 'HIDDEN'; mole.activeIdx = -1; mole.yOffset = 100;
-            hammer.state = 'IDLE'; hammer.activeIdx = -1;
+            hammer.state = 'IDLE'; hammer.activeIdx = -1; hammer.time = 0;
             particles = [];
             gameState = 'PLAYING';
             lastTime = performance.now();
@@ -254,7 +261,7 @@
             p1ScoreEl.innerText = Math.floor(p1Score);
             p2ScoreEl.innerText = p2Score;
             if (p1Score >= GAME_CONFIG.winScore) endGame("🦫 地鼠 (P1)");
-            else if (p2Score >= GAME_CONFIG.winScore) endGame("🔨 锤子 (P2)");
+            else if (p2Score >= GAME_CONFIG.winScore) endGame("🔨 猎手 (P2)");
         }
 
         function endGame(winner) {
@@ -268,13 +275,35 @@
             particles.push({ x, y, text, color, life: 1.0, dy: -50 });
         }
 
+        /**
+         * 🎯 自定义高加速 + 急刹制动物理曲线
+         * 通过分段多项式，使锤子在前 td 阶段处于高加速状态，随后在 td 到 1.0 阶段以一阶连续(C1)的状态瞬间减速制动归 0
+         */
+        function getSwingProgress(t) {
+            const td = GAME_CONFIG.hammerSwingDecelStart;
+            const p = GAME_CONFIG.hammerSwingPower;
+            const k = 1 - td;
+            
+            // 求解满足位置与速度连续的二次多项式系数 c
+            const c = 1 / ((2 * k * td) / p + k * k);
+            const y0 = 1 - c * k * k;
+            const a = y0 / Math.pow(td, p);
+            
+            if (t < td) {
+                // 1. 高加速度上升阶段：速度从 0 持续增大，并在 td 达到 v_max
+                return a * Math.pow(t, p);
+            } else {
+                // 2. 强力制动阶段：在底部的最后区间瞬间将速度制动至 0
+                return 1 - c * Math.pow(1 - t, 2);
+            }
+        }
+
         /** --- 主更新逻辑 --- */
         function update(dt) {
             const moleSpeed = GAME_CONFIG.moleSpeed; 
 
             // --- 地鼠状态机 ---
             if (mole.state === 'RISING') {
-                // 阶段1：升到 1/3 高度
                 mole.yOffset -= moleSpeed * dt;
                 if (mole.yOffset <= GAME_CONFIG.molePartialOffset) {
                     mole.yOffset = GAME_CONFIG.molePartialOffset;
@@ -282,28 +311,24 @@
                     mole.readyTimer = GAME_CONFIG.moleReadyDelay; 
                 }
             } else if (mole.state === 'DELAY') {
-                // 阶段2：在 1/3 高度处停留等待
                 mole.readyTimer -= dt;
                 if (mole.readyTimer <= 0) {
                     mole.state = 'RISING_FULL';
                 }
             } else if (mole.state === 'RISING_FULL') {
-                // 阶段3：延迟结束，完全探头
                 mole.yOffset -= moleSpeed * dt;
                 if (mole.yOffset <= 0) {
                     mole.yOffset = 0;
                     mole.state = 'UP';
-                    mole.scoreTimer = 0; // 准备开始加分
+                    mole.scoreTimer = 0;
                 }
             } else if (mole.state === 'FALLING') {
-                // 回缩
                 mole.yOffset += moleSpeed * dt;
                 if (mole.yOffset >= 100) {
                     mole.yOffset = 100; mole.state = 'HIDDEN'; mole.activeIdx = -1;
                     handleInput(); 
                 }
             } else if (mole.state === 'UP') {
-                // 阶段4：持续加分
                 mole.scoreTimer += dt;
                 if (mole.scoreTimer >= GAME_CONFIG.moleScoreInterval) { 
                     p1Score += GAME_CONFIG.moleScorePerTick;
@@ -311,13 +336,11 @@
                     AudioSys.score();
                     updateHUD();
                     
-                    // 添加地鼠的 +1 粒子特效 (带一点随机X轴偏移让连续加分字体重叠得更好看)
                     const h = holes[mole.activeIdx];
                     const jitterX = (Math.random() - 0.5) * 20; 
                     addParticle(h.x - 30 + jitterX, h.y - 60, "+" + GAME_CONFIG.moleScorePerTick, "#f1c40f");
                 }
             } else if (mole.state === 'STUNNED') {
-                // 被砸晕
                 mole.stunTimer -= dt;
                 if (mole.yOffset < 100) mole.yOffset += (moleSpeed * GAME_CONFIG.moleStunRetractMult) * dt; 
                 if (mole.yOffset > 100) mole.yOffset = 100;
@@ -329,21 +352,33 @@
 
             // --- 锤子状态机 ---
             if (hammer.state === 'SWING_DOWN') {
+                hammer.time += dt;
+                let t = Math.min(hammer.time / GAME_CONFIG.hammerSwingTime, 1.0);
+                
+                // 使用优化后的分段曲线计算插值进度
+                let easeT = getSwingProgress(t);
                 const totalAngle = GAME_CONFIG.hammerStartAngle - GAME_CONFIG.hammerEndAngle;
-                // 匀速下砸
-                hammer.angle -= (totalAngle / GAME_CONFIG.hammerSwingTime) * dt; 
-                if (hammer.angle <= GAME_CONFIG.hammerEndAngle) { 
+                hammer.angle = GAME_CONFIG.hammerStartAngle - easeT * totalAngle;
+
+                // 进度完全到达底部(t = 1)的那一帧触发判定，并在该点速度完美降为 0 后切换到抬起状态
+                if (t >= 1.0) {
                     hammer.angle = GAME_CONFIG.hammerEndAngle;
-                    hammer.state = 'RECOVER';
                     checkCollision();
+                    hammer.state = 'RECOVER';
+                    hammer.time = 0;
                 }
             } else if (hammer.state === 'RECOVER') {
-                // 快速拔起
+                hammer.time += dt;
+                let t = Math.min(hammer.time / GAME_CONFIG.hammerRecoverTime, 1.0);
+                
+                // 线性拔起恢复
                 const totalAngle = GAME_CONFIG.hammerStartAngle - GAME_CONFIG.hammerEndAngle;
-                hammer.angle += (totalAngle / GAME_CONFIG.hammerRecoverTime) * dt;
-                if (hammer.angle >= GAME_CONFIG.hammerStartAngle) {
+                hammer.angle = GAME_CONFIG.hammerEndAngle + t * totalAngle;
+
+                if (t >= 1.0) {
                     hammer.angle = GAME_CONFIG.hammerStartAngle;
-                    hammer.state = 'IDLE'; hammer.activeIdx = -1;
+                    hammer.state = 'IDLE'; 
+                    hammer.activeIdx = -1;
                     handleInput(); 
                 }
             }
@@ -359,8 +394,7 @@
         // 碰撞判定
         function checkCollision() {
             if (hammer.hasHit) return;
-            // 砸下的洞必须和地鼠一致，地鼠未眩晕，且探头高度达到了暴露阈值 (yOffset < 80)
-            // 注意：因为 1/3 停留时的 yOffset 是 66，66 < 80，所以地鼠在停留等待期间也能被打中！这符合游戏设计初衷。
+            // 确保砸中的洞和地鼠对应，且地鼠探出到可判定范围
             if (hammer.activeIdx === mole.activeIdx && mole.state !== 'STUNNED' && mole.yOffset < GAME_CONFIG.moleHitboxOffset) {
                 hammer.hasHit = true;
                 p2Score += GAME_CONFIG.hammerScorePerHit; 
@@ -405,7 +439,7 @@
                 ctx.beginPath(); ctx.roundRect(h.x - 40, my - 80, 80, 100, 40); ctx.fill();
 
                 if (customMoleImg && mole.state !== 'STUNNED') {
-                    // 自定义头像（裁剪为圆形贴在脸上）
+                    // 自定义头像
                     ctx.save();
                     ctx.beginPath(); ctx.arc(h.x, my - 45, 30, 0, Math.PI * 2); ctx.clip();
                     ctx.drawImage(customMoleImg, h.x - 30, my - 75, 60, 60);
@@ -428,27 +462,99 @@
                 ctx.restore();
             }
 
-            // 画锤子
+            // 画卡通人物与锤子
             if (hammer.activeIdx !== -1) {
                 const h = holes[hammer.activeIdx];
                 ctx.save();
-                ctx.translate(h.x + 50, h.y);
+                // 移动到洞口右下侧作为旋转的支点
+                ctx.translate(h.x + 80, h.y + 20);
                 ctx.rotate(hammer.angle);
                 
-                // 柄
-                ctx.fillStyle = '#8e44ad'; ctx.fillRect(-10, -80, 20, 100);
-                // 头
-                ctx.fillStyle = '#95a5a6'; ctx.beginPath(); ctx.roundRect(-40, -110, 80, 50, 10); ctx.fill();
-                ctx.strokeStyle = '#2c3e50'; ctx.lineWidth=2; ctx.stroke();
-                // 侧面打击区
-                ctx.fillStyle = '#bdc3c7'; ctx.fillRect(-40, -100, 10, 30);
+                // 1. 身体 (卡通人物的衣服/背带裤)
+                ctx.fillStyle = '#3498db'; // 蓝色
+                ctx.beginPath();
+                ctx.roundRect(-20, -35, 40, 45, [15, 15, 0, 0]);
+                ctx.fill();
+                
+                // 背带裤黄扣子
+                ctx.fillStyle = '#f1c40f';
+                ctx.beginPath(); ctx.arc(-8, -15, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(8, -15, 3, 0, Math.PI * 2); ctx.fill();
 
-                // 自定义锤子贴花 (贴在侧边)
+                // 2. 手臂 (挥舞锤子)
+                ctx.strokeStyle = '#e67e22'; // 皮肤色
+                ctx.lineWidth = 10;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(-10, -20);
+                ctx.lineTo(-35, -45); 
+                ctx.stroke();
+
+                // 手部 (拳头)
+                ctx.fillStyle = '#f39c12';
+                ctx.beginPath(); ctx.arc(-35, -45, 7, 0, Math.PI * 2); ctx.fill();
+
+                // 3. 锤子柄 (从手心伸出)
+                ctx.strokeStyle = '#7e5109'; // 木质深褐
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(-15, -25);
+                ctx.lineTo(-75, -85); 
+                ctx.stroke();
+
+                // 4. 锤子头 (纯卡通金属质感，无贴纸)
+                ctx.save();
+                ctx.translate(-75, -85);
+                ctx.rotate(-Math.PI / 4); // 调整锤头方向顺着手柄
+                ctx.fillStyle = '#7f8c8d'; // 铁灰色
+                ctx.beginPath();
+                ctx.roundRect(-15, -25, 30, 50, 6);
+                ctx.fill();
+                // 锤子金属高光
+                ctx.fillStyle = '#95a5a6';
+                ctx.fillRect(-15, -15, 10, 30);
+                ctx.restore();
+
+                // 5. 卡通人物头部 (贴纸应用在这里)
+                const headX = 0;
+                const headY = -60;
+                const headRadius = 22;
+
                 if (customHammerImg) {
+                    // 如果上传了猎手贴纸，则将其剪切为圆形贴在人物头上
                     ctx.save();
-                    ctx.beginPath(); ctx.roundRect(-25, -105, 40, 40, 5); ctx.clip();
-                    ctx.drawImage(customHammerImg, -25, -105, 40, 40);
+                    ctx.beginPath();
+                    ctx.arc(headX, headY, headRadius, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.drawImage(customHammerImg, headX - headRadius, headY - headRadius, headRadius * 2, headRadius * 2);
                     ctx.restore();
+                    
+                    // 为贴纸戴上一顶红色鸭舌帽
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.beginPath();
+                    ctx.arc(headX, headY - 12, 16, Math.PI, 0);
+                    ctx.fill();
+                    ctx.fillRect(headX - 22, headY - 15, 44, 4); // 帽檐
+                } else {
+                    // 默认卡通面部
+                    ctx.fillStyle = '#f3d19e'; // 肤色
+                    ctx.beginPath(); ctx.arc(headX, headY, headRadius, 0, Math.PI * 2); ctx.fill();
+
+                    // 眼睛
+                    ctx.fillStyle = '#2c3e50';
+                    ctx.beginPath(); ctx.arc(headX - 7, headY - 4, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(headX + 7, headY - 4, 3, 0, Math.PI * 2); ctx.fill();
+
+                    // 腮红与微笑
+                    ctx.strokeStyle = '#e74c3c';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(headX, headY + 4, 6, 0, Math.PI); ctx.stroke();
+
+                    // 红色鸭舌帽
+                    ctx.fillStyle = '#e74c3c';
+                    ctx.beginPath(); ctx.arc(headX, headY - 12, 16, Math.PI, 0); ctx.fill();
+                    ctx.fillRect(headX - 22, headY - 15, 44, 4); 
                 }
 
                 ctx.restore();
