@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>房产分析</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        /* 拟合数学公式公式代码块 */
+        .formula-box {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans pb-12">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white py-6 px-4 shadow-md mb-8 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto">
+            <h1 class="text-2xl md:text-3xl font-bold tracking-tight">房产分析</h1>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+        <!-- 左侧：输入参数区 (5 cols) -->
+        <div class="lg:col-span-5 space-y-6">
+
+            <!-- 1. 市场当前价格 -->
+            <div class="bg-amber-50/80 p-5 rounded-xl shadow-sm border border-amber-200">
+                <h2 class="text-base font-bold text-amber-900 mb-3 flex justify-between items-center">
+                    <span>1. 市场当前房产价格</span>
+                    <span class="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded font-normal">实际交易/买入价</span>
+                </h2>
+                
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <label class="block font-medium text-amber-900">当前房屋单价 (元/平米)</label>
+                        <div class="mt-1 flex gap-2">
+                            <input type="number" id="inputMarketPrice" value="8000" step="500" class="w-full p-2 border border-amber-300 rounded-md focus:ring-2 focus:ring-amber-500 outline-none font-bold text-amber-900 text-base">
+                            <button onclick="syncTheoreticalPrice()" class="whitespace-nowrap px-3 py-1.5 bg-amber-200 hover:bg-amber-300 text-amber-900 text-xs rounded border border-amber-300 font-medium transition">
+                                套用理论估值
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-xs text-amber-800/80 flex justify-between pt-1">
+                        <span>当前评估总价: <strong id="textMarketTotalPrice" class="text-amber-900">300.00</strong> 万元</span>
+                        <span>暗含 Cap Rate: <strong id="textImpliedCapRate" class="text-amber-900">0.00%</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 资产端与租金参数 -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-base font-bold text-slate-900 mb-4 pb-2 border-b flex justify-between items-center">
+                    <span>2. 基础租金与现金流参数</span>
+                    <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-normal">NOI 算子</span>
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <label class="block font-medium text-slate-700">基础月租金 R (元/平米)</label>
+                        <input type="number" id="inputR" value="20" step="0.5" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">房屋面积 (平米)</label>
+                        <input type="number" id="inputArea" value="100" step="1" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">空置率 V (%)</label>
+                        <input type="number" id="inputV" value="5" step="0.1" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">运营成本率 M (%)</label>
+                        <input type="number" id="inputM" value="5" step="0.1" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">城市标度律系数 k</label>
+                        <input type="number" id="inputK" value="1.25" step="0.05" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">预期人口增长率 (%)</label>
+                        <input type="number" id="inputPopGrowth" value="0.8" step="0.1" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+                <div class="mt-3 bg-slate-50 p-2.5 rounded border text-xs text-slate-600">
+                    租金年增长率 g = k × 人口增长率 = <span id="textG" class="font-bold text-indigo-600 text-sm">1.00%</span>
+                </div>
+            </div>
+
+            <!-- 3. 定价模型与融资参数 -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-base font-bold text-slate-900 mb-4 pb-2 border-b flex justify-between items-center">
+                    <span>3. 理论定价与房贷融资参数</span>
+                    <span class="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-normal">折现率/贷款</span>
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <label class="block font-medium text-slate-700">无风险利率 r_f (%)</label>
+                        <input type="number" id="inputRf" value="2.2" step="0.05" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">流动性溢价 L (%)</label>
+                        <input type="number" id="inputL" value="2.5" step="0.1" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">5年期以上 LPR (%)</label>
+                        <input type="number" id="inputLPR" value="3.50" step="0.05" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">LPR 加点/减点 (BP)</label>
+                        <input type="number" id="inputBP" value="0" step="5" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">房产税 T (%)</label>
+                        <input type="number" id="inputT" value="0" step="0.1" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-medium text-slate-700">贷款首付比例 (%)</label>
+                        <input type="number" id="inputDownPayment" value="30" step="5" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block font-medium text-slate-700">房贷期限 (年)</label>
+                        <input type="number" id="inputYears" value="30" step="1" class="mt-1 w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <!-- REITs 预设快捷按钮 -->
+                <div class="mt-4 pt-3 border-t">
+                    <label class="block text-xs font-semibold text-slate-500 mb-2">REITs 市场利差快捷设定 (CapRate - r_f):</label>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <button onclick="setReitSpread(1.5)" class="p-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 rounded border text-left">一线核心 (1.5%)</button>
+                        <button onclick="setReitSpread(2.0)" class="p-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 rounded border text-left">一线一般 (2.0%)</button>
+                        <button onclick="setReitSpread(2.2)" class="p-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 rounded border text-left">二线核心 (2.2%)</button>
+                        <button onclick="setReitSpread(3.0)" class="p-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 rounded border text-left">二线一般 (3.0%)</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 右侧：计算结果展示区 (7 cols) -->
+        <div class="lg:col-span-7 space-y-6">
+
+            <!-- 1. 价格对比看板与公式 -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="text-base font-bold text-slate-900 mb-3 flex justify-between items-center">
+                    <span>价格与溢价率看板</span>
+                    <span class="text-xs font-normal text-slate-400">理论估值 vs 市场当前价</span>
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <!-- Cap Rate 理论价 -->
+                    <div class="p-3 bg-indigo-50/70 rounded-lg border border-indigo-100">
+                        <span class="text-xs font-semibold text-indigo-900 block">Cap Rate 理论估值</span>
+                        <div class="mt-2">
+                            <span class="text-xl font-extrabold text-indigo-900" id="resPriceCap">0</span>
+                            <span class="text-xs text-indigo-700"> 元/㎡</span>
+                        </div>
+                        <div class="text-xs text-indigo-600/80 mt-1">
+                            总价: <span id="resTotalPriceCap">0</span> 万
+                        </div>
+                    </div>
+
+                    <!-- LPR 理论价 -->
+                    <div class="p-3 bg-slate-100/70 rounded-lg border border-slate-200">
+                        <span class="text-xs font-semibold text-slate-700 block">LPR 融资估值</span>
+                        <div class="mt-2">
+                            <span class="text-xl font-extrabold text-slate-800" id="resPriceLPR">0</span>
+                            <span class="text-xs text-slate-600"> 元/㎡</span>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1">
+                            总价: <span id="resTotalPriceLPR">0</span> 万
+                        </div>
+                    </div>
+
+                    <!-- 市场当前价格 -->
+                    <div class="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                        <span class="text-xs font-semibold text-amber-900 block">市场当前价格</span>
+                        <div class="mt-2">
+                            <span class="text-xl font-extrabold text-amber-900" id="resPriceMarket">0</span>
+                            <span class="text-xs text-amber-800"> 元/㎡</span>
+                        </div>
+                        <div class="text-xs text-amber-800 mt-1 flex justify-between">
+                            <span>溢价率:</span>
+                            <span class="font-bold" id="resValuationGap">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 估值与价格计算公式展示区 -->
+                <div class="border-t pt-3 space-y-2">
+                    <span class="text-xs font-bold text-slate-700 block">估值模型:</span>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs formula-box">
+                        <div class="p-2 bg-slate-50 rounded border text-slate-600">
+                            <div class="font-bold text-slate-800 mb-0.5">净营业收入 (NOI):</div>
+                            <code>NOI = R × 12 × (1 - V) × (1 - M)</code>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border text-slate-600">
+                            <div class="font-bold text-slate-800 mb-0.5">Cap Rate 理论定价:</div>
+                            <code>P_cap = NOI / (r_f + L + T - g)</code>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border text-slate-600">
+                            <div class="font-bold text-slate-800 mb-0.5">LPR 融资折现定价:</div>
+                            <code>P_LPR = NOI / (LPR + BP + T - g)</code>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border text-slate-600">
+                            <div class="font-bold text-slate-800 mb-0.5">市场暗含 Cap Rate & 溢价率:</div>
+                            <code>Cap_暗含 = NOI / P_当前单价</code><br>
+                            <code>溢价率 = (P_当前 - P_cap) / P_cap</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 久期分析与公式 -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="text-base font-bold text-slate-900">久期 (Duration)</h3>
+                    <span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">基于暗含 Cap Rate</span>
+                </div>
+                <p class="text-xs text-slate-500 mb-4">资产久期由当前房价倒推的暗含 Cap Rate 决定；负债久期由当前房价对应的贷款额决定。</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <!-- 久期 1：当前资产久期 -->
+                    <div class="p-3 bg-amber-50/60 rounded-lg border border-amber-200">
+                        <div class="text-xs font-bold text-amber-900 mb-1 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-amber-600"></span>
+                            当前房产资产 (暗含 Cap Rate)
+                        </div>
+                        <div class="mt-2 space-y-1 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">修正久期 (ModD):</span>
+                                <span class="font-bold text-amber-800 text-sm" id="resModDAsset">0 年</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">麦考利久期 (MacD):</span>
+                                <span class="font-medium text-slate-700" id="resMacDAsset">0 年</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 久期 2：CPM -->
+                    <div class="p-3 bg-purple-50/60 rounded-lg border border-purple-100">
+                        <div class="text-xs font-bold text-purple-900 mb-1 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-purple-600"></span>
+                            房贷 (等额本息 CPM)
+                        </div>
+                        <div class="mt-2 space-y-1 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">修正久期 (ModD):</span>
+                                <span class="font-bold text-purple-700 text-sm" id="resModDCPM">0 年</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">麦考利久期 (MacD):</span>
+                                <span class="font-medium text-slate-700" id="resMacDCPM">0 年</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 久期 3：CAM -->
+                    <div class="p-3 bg-emerald-50/60 rounded-lg border border-emerald-100">
+                        <div class="text-xs font-bold text-emerald-900 mb-1 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+                            房贷 (等额本金 CAM)
+                        </div>
+                        <div class="mt-2 space-y-1 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">修正久期 (ModD):</span>
+                                <span class="font-bold text-emerald-700 text-sm" id="resModDCAM">0 年</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">麦考利久期 (MacD):</span>
+                                <span class="font-medium text-slate-700" id="resMacDCAM">0 年</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 久期计算公式展示区 -->
+                <div class="border-t pt-3 space-y-2">
+                    <span class="text-xs font-bold text-slate-700 block">久期 (Duration) 计算公式:</span>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs formula-box">
+                        <div class="p-2 bg-amber-50/50 rounded border border-amber-200/80 text-amber-900">
+                            <div class="font-bold mb-0.5">永续资产久期公式:</div>
+                            <code>ModD_资产 = 1 / Cap_暗含</code><br>
+                            <code>MacD_资产 = ModD × (1 + Cap_暗含)</code>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border text-slate-600">
+                            <div class="font-bold text-slate-800 mb-0.5">房贷负债久期公式 (CPM & CAM):</div>
+                            <code>MacD = [Σ (t × PV(PMT_t))] / 总贷款</code><br>
+                            <code>ModD = MacD / (1 + r_月利率)</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 基于当前房价的房贷与现金流算卡与公式 -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-3 pb-2 border-b">
+                    <h3 class="text-base font-bold text-slate-900">房贷还款与现金流对比</h3>
+                    <span class="text-xs text-slate-500">按当前市场总价 × (1 - 首付比例) 计算贷款</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
+                    <!-- CPM 明细 -->
+                    <div class="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-2">
+                        <div class="font-bold text-purple-900 flex justify-between">
+                            <span>等额本息 (CPM)</span>
+                            <span class="text-xs font-normal text-slate-500">固定月供</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-600">每月房贷还款:</span>
+                            <span class="font-bold text-rose-600" id="resCpmPmt">0 元</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-600">每月净现金流 (NOI - 月供):</span>
+                            <span class="font-bold" id="resCpmNetCash">0 元</span>
+                        </div>
+                        <div class="flex justify-between text-xs pt-1 border-t">
+                            <span class="text-slate-500">总贷款额（按当前市场价）:</span>
+                            <span class="font-medium text-slate-700" id="resRealLoanCpm">0 万元</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-500">累计支付总利息:</span>
+                            <span class="font-medium text-slate-700" id="resCpmInterest">0 万元</span>
+                        </div>
+                    </div>
+
+                    <!-- CAM 明细 -->
+                    <div class="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-2">
+                        <div class="font-bold text-emerald-900 flex justify-between">
+                            <span>等额本金 (CAM)</span>
+                            <span class="text-xs font-normal text-slate-500">首月最高 / 逐月递减</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-600">首月还款 / 每月递减:</span>
+                            <span class="font-bold text-rose-600" id="resCamPmt">0 / 0 元</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-600">首月净现金流 (NOI - 月供):</span>
+                            <span class="font-bold" id="resCamNetCash">0 元</span>
+                        </div>
+                        <div class="flex justify-between text-xs pt-1 border-t">
+                            <span class="text-slate-500">总贷款额（按当前市场价）:</span>
+                            <span class="font-medium text-slate-700" id="resRealLoanCam">0 万元</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-500">累计支付总利息:</span>
+                            <span class="font-medium text-slate-700" id="resCamInterest">0 万元</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 房贷与现金流公式展示区 -->
+                <div class="border-t pt-3 space-y-2">
+                    <span class="text-xs font-bold text-slate-700 block">房贷月供与现金流公式:</span>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs formula-box">
+                        <div class="p-2 bg-slate-50 rounded border text-slate-600">
+                            <div class="font-bold text-slate-800 mb-0.5">等额本息 (CPM) 每月还款:</div>
+                            <code>PMT = L × [r_m(1+r_m)^N] / [(1+r_m)^N - 1]</code>
+                        </div>
+                        <div class="p-2 bg-slate-50 rounded border text-slate-600">
+                            <div class="font-bold text-slate-800 mb-0.5">等额本金 (CAM) 第 t 月还款:</div>
+                            <code>PMT_t = (L / N) + [L - (t-1)(L/N)] × r_m</code><br>
+                            <code>每月递减量 = (L / N) × r_m</code>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <!-- JS 业务逻辑 -->
+    <script>
+        const $ = id => document.getElementById(id);
+
+        const inputIds = [
+            'inputMarketPrice', 'inputR', 'inputArea', 'inputV', 'inputM', 'inputRf', 
+            'inputL', 'inputT', 'inputK', 'inputPopGrowth',
+            'inputLPR', 'inputBP', 'inputDownPayment', 'inputYears'
+        ];
+
+        let calculatedPriceCapGlobal = 0; // 全局存储计算出的理论单价
+
+        inputIds.forEach(id => {
+            $(id).addEventListener('input', calculate);
+        });
+
+        // 将理论单价快速套用到市场单价
+        function syncTheoreticalPrice() {
+            if (calculatedPriceCapGlobal > 0) {
+                $('inputMarketPrice').value = Math.round(calculatedPriceCapGlobal);
+                calculate();
+            }
+        }
+
+        function setReitSpread(spread) {
+            const rf = parseFloat($('inputRf').value) || 0;
+            const t = parseFloat($('inputT').value) || 0;
+            const k = parseFloat($('inputK').value) || 1.25;
+            const popGrowth = parseFloat($('inputPopGrowth').value) || 0;
+            const g = (k * popGrowth) / 100;
+
+            let l = spread - t + (g * 100);
+            if (l < 0) l = 0;
+            
+            $('inputL').value = l.toFixed(2);
+            calculate();
+        }
+
+        function calculate() {
+            // 1. 读取基础参数
+            const marketPricePerSqm = parseFloat($('inputMarketPrice').value) || 0;
+            const R = parseFloat($('inputR').value) || 0;
+            const area = parseFloat($('inputArea').value) || 0;
+            const V = (parseFloat($('inputV').value) || 0) / 100;
+            const M = (parseFloat($('inputM').value) || 0) / 100;
+            const rf = (parseFloat($('inputRf').value) || 0) / 100;
+            const L = (parseFloat($('inputL').value) || 0) / 100;
+            const T = (parseFloat($('inputT').value) || 0) / 100;
+            const k = parseFloat($('inputK').value) || 0;
+            const popGrowth = (parseFloat($('inputPopGrowth').value) || 0) / 100;
+
+            const lpr = (parseFloat($('inputLPR').value) || 0) / 100;
+            const bp = parseFloat($('inputBP').value) || 0;
+            const downPaymentPct = (parseFloat($('inputDownPayment').value) || 0) / 100;
+            const years = parseInt($('inputYears').value) || 30;
+
+            // 2. 租金 NOI 与增长率 g
+            const g = k * popGrowth;
+            $('textG').innerText = (g * 100).toFixed(2) + '%';
+
+            const annualNOIperSqm = R * 12 * (1 - V) * (1 - M);
+            const monthlyNOITotal = (annualNOIperSqm * area) / 12;
+
+            // 3. 模型理论估值
+            // 3a. Cap Rate 理论估值
+            const capRateTheoretical = rf + L + T - g;
+            let priceCap = 0;
+            if (capRateTheoretical > 0) {
+                priceCap = annualNOIperSqm / capRateTheoretical;
+            }
+            calculatedPriceCapGlobal = priceCap; // 供快捷同步使用
+            const totalPriceCap = priceCap * area;
+
+            // 3b. LPR 理论估值
+            const mortgageRate = lpr + (bp / 10000);
+            const lprDiscountRate = mortgageRate + T - g;
+            let priceLPR = 0;
+            if (lprDiscountRate > 0) {
+                priceLPR = annualNOIperSqm / lprDiscountRate;
+            }
+            const totalPriceLPR = priceLPR * area;
+
+            // 4. 市场当前价格与倒推暗含 Cap Rate
+            const marketTotalPrice = marketPricePerSqm * area;
+            let impliedCapRate = 0;
+            if (marketPricePerSqm > 0) {
+                impliedCapRate = annualNOIperSqm / marketPricePerSqm;
+            }
+
+            // 估值偏差/溢价率 (市场价相对 CapRate 理论价)
+            let valuationGapPct = 0;
+            if (priceCap > 0) {
+                valuationGapPct = ((marketPricePerSqm - priceCap) / priceCap) * 100;
+            }
+
+            // 更新面板 1 (价格与溢价)
+            $('resPriceCap').innerText = Math.round(priceCap).toLocaleString();
+            $('resTotalPriceCap').innerText = (totalPriceCap / 10000).toFixed(1);
+            
+            $('resPriceLPR').innerText = Math.round(priceLPR).toLocaleString();
+            $('resTotalPriceLPR').innerText = (totalPriceLPR / 10000).toFixed(1);
+
+            $('resPriceMarket').innerText = Math.round(marketPricePerSqm).toLocaleString();
+            $('textMarketTotalPrice').innerText = (marketTotalPrice / 10000).toFixed(2);
+            $('textImpliedCapRate').innerText = (impliedCapRate * 100).toFixed(2) + '%';
+
+            const $valGap = $('resValuationGap');
+            const sign = valuationGapPct > 0 ? '+' : '';
+            $valGap.innerText = sign + valuationGapPct.toFixed(1) + '%';
+            $valGap.className = valuationGapPct > 0 ? 'font-bold text-rose-600' : 'font-bold text-emerald-600';
+
+            // -------------------------------------------------------------
+            // 5. 三维久期计算 (基于当前市场价格及暗含 Cap Rate)
+            // -------------------------------------------------------------
+
+            // 5a. 资产久期 (使用当前市场倒推的 impliedCapRate)
+            let assetModD = 0;
+            let assetMacD = 0;
+            if (impliedCapRate > 0) {
+                assetModD = 1 / impliedCapRate; // 修正久期
+                assetMacD = assetModD * (1 + impliedCapRate); // 麦考利久期
+            }
+            $('resModDAsset').innerText = assetModD.toFixed(2) + ' 年';
+            $('resMacDAsset').innerText = assetMacD.toFixed(2) + ' 年';
+
+            // 5b. 当前房贷参数 (基于当前总价计算贷款额)
+            const realLoanAmount = marketTotalPrice * (1 - downPaymentPct);
+            const months = years * 12;
+            const monthlyRate = mortgageRate / 12;
+
+            // 5c. 等额本息 (CPM) 久期及还款
+            let cpmPmt = 0;
+            let cpmTotalInterest = 0;
+            let cpmMacDYears = 0;
+            let cpmModDYears = 0;
+
+            if (realLoanAmount > 0 && monthlyRate > 0) {
+                cpmPmt = realLoanAmount * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
+                cpmTotalInterest = (cpmPmt * months) - realLoanAmount;
+
+                let weightedSumCPM = 0;
+                let pvSumCPM = 0;
+                for (let t = 1; t <= months; t++) {
+                    let discountFactor = Math.pow(1 + monthlyRate, t);
+                    let pv = cpmPmt / discountFactor;
+                    pvSumCPM += pv;
+                    weightedSumCPM += t * pv;
+                }
+                let cpmMacDMonths = weightedSumCPM / pvSumCPM;
+                cpmMacDYears = cpmMacDMonths / 12;
+                cpmModDYears = cpmMacDYears / (1 + monthlyRate);
+            }
+
+            $('resModDCPM').innerText = cpmModDYears.toFixed(2) + ' 年';
+            $('resMacDCPM').innerText = cpmMacDYears.toFixed(2) + ' 年';
+
+            // 5d. 等额本金 (CAM) 久期及还款
+            const camMonthlyPrincipal = realLoanAmount / months;
+            const camFirstPmt = camMonthlyPrincipal + (realLoanAmount * monthlyRate);
+            const camMonthlyDecrease = camMonthlyPrincipal * monthlyRate;
+            const camTotalInterest = ((months + 1) * realLoanAmount * monthlyRate) / 2;
+
+            let camMacDYears = 0;
+            let camModDYears = 0;
+
+            if (realLoanAmount > 0 && monthlyRate > 0) {
+                let weightedSumCAM = 0;
+                let pvSumCAM = 0;
+                for (let t = 1; t <= months; t++) {
+                    let remainingPrincipal = realLoanAmount - (t - 1) * camMonthlyPrincipal;
+                    let interestPmt = remainingPrincipal * monthlyRate;
+                    let pmt_t = camMonthlyPrincipal + interestPmt;
+
+                    let discountFactor = Math.pow(1 + monthlyRate, t);
+                    let pv = pmt_t / discountFactor;
+
+                    pvSumCAM += pv;
+                    weightedSumCAM += t * pv;
+                }
+                let camMacDMonths = weightedSumCAM / pvSumCAM;
+                camMacDYears = camMacDMonths / 12;
+                camModDYears = camMacDYears / (1 + monthlyRate);
+            }
+
+            $('resModDCAM').innerText = camModDYears.toFixed(2) + ' 年';
+            $('resMacDCAM').innerText = camMacDYears.toFixed(2) + ' 年';
+
+            // 6. 更新当前房贷与现金流卡片
+            $('resCpmPmt').innerText = Math.round(cpmPmt).toLocaleString() + ' 元';
+            const cpmNetCash = monthlyNOITotal - cpmPmt;
+            $('resCpmNetCash').innerText = Math.round(cpmNetCash).toLocaleString() + ' 元';
+            $('resCpmNetCash').className = cpmNetCash >= 0 ? 'font-bold text-emerald-600' : 'font-bold text-rose-600';
+            $('resRealLoanCpm').innerText = (realLoanAmount / 10000).toFixed(1) + ' 万元';
+            $('resCpmInterest').innerText = (cpmTotalInterest / 10000).toFixed(1) + ' 万元';
+
+            $('resCamPmt').innerText = Math.round(camFirstPmt).toLocaleString() + ' / -' + camMonthlyDecrease.toFixed(0) + ' 元';
+            const camNetCash = monthlyNOITotal - camFirstPmt;
+            $('resCamNetCash').innerText = Math.round(camNetCash).toLocaleString() + ' 元';
+            $('resCamNetCash').className = camNetCash >= 0 ? 'font-bold text-emerald-600' : 'font-bold text-rose-600';
+            $('resRealLoanCam').innerText = (realLoanAmount / 10000).toFixed(1) + ' 万元';
+            $('resCamInterest').innerText = (camTotalInterest / 10000).toFixed(1) + ' 万元';
+        }
+
+        // 初始化
+        calculate();
+    </script>
+</body>
+</html>

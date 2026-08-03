@@ -23,3 +23,5 @@ order: 4
 - [图像校正 - perspective变换](/misc/perspective.html)
 - [砸地鼠](/misc/whack-a-mole.html)
 - [SVG 组图工具](/misc/SVG_grouping_tool.html)
+- [多人掷骰子](/misc/roll_dice.html)
+- [房产](/misc/house.html)
