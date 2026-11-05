@@ -25,3 +25,5 @@ order: 4
 - [SVG 组图工具](/misc/SVG_grouping_tool.html)
 - [多人掷骰子](/misc/roll_dice.html)
 - [房产](/misc/house.html)
+- [HE脂肪细胞分割定量面积分析](/misc/CellSeg_Batch_HE_Adipocyte.html)
+- [组织染色面积计量](/misc/stain_area_analyzer.html)
