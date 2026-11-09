@@ -27,3 +27,5 @@ order: 4
 - [房产](/misc/house.html)
 - [HE脂肪细胞分割定量面积分析](/misc/CellSeg_Batch_HE_Adipocyte.html)
 - [组织染色面积计量](/misc/stain_area_analyzer.html)
+- [学术英语考试](/misc/academic_exam.html)
+
