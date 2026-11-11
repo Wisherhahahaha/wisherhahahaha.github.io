@@ -53,33 +53,52 @@ function validateBank(b){const fail=m=>{throw new Error(m)};if(!b||typeof b!=='o
 async function importFile(file){if(!file)return;if(!file.name.toLowerCase().endsWith('.json')){showToast('请选择 .json 文件。');return}try{const text=await file.text(),b=JSON.parse(text);validateBank(b);setBank(b)}catch(e){showToast('导入失败：'+e.message)}}
 function exportFile(data,name,type='application/json'){const blob=new Blob([typeof data==='string'?data:JSON.stringify(data,null,2)],{type:type+';charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 async function copyText(s){try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(s);showToast('已复制到剪贴板');return}const ta=document.createElement('textarea');ta.value=s;ta.style.position='fixed';ta.style.top='-9999px';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();if(ok){showToast('已复制到剪贴板');return}throw Error('Copy blocked')}catch(e){showToast('浏览器未允许复制。可在文本框中全选复制，或使用导出文件。')}}
-function promptForLLM(){return `你是一名「学术英语 + 学科专业」命题专家。请根据我提供的新素材生成一份可导入 ScholarAssess 离线考试 HTML 的 UTF-8 纯 JSON 题库。不要输出 Markdown 围栏或其他解释。
+function promptForLLM(){return `你是一名「学术英语 + 学科专业」命题专家。请根据我提供的新素材生成一份符合要求的 UTF-8 纯 JSON 题库。不要输出 Markdown 围栏、不要输出任何解释说明，首尾字符必须是 { 和 }。
 
-【考试设计】
-- 30 分钟，12 道题：9 道客观题 + 3 道英文简答题；两篇学术化英文阅读，共 800–1000 个英文词，阅读长度应适合限时作答。
-- 总分 100，英语能力 40 分、学科能力 60 分；客观题合计 60 分，简答合计 40 分。每道题包含 points、englishPoints 和 professionalPoints，并保证三个汇总准确相等。简答 rubric 各项分数的维度汇总也必须一致。
-- 英语题考释义、指代、论证逻辑、证据定位、概括；专业题考概念、机制、方法评价、适用条件、实践应用及跨文本比较。
-- 删去素材中的口头语、记忆技巧、重复、玩笑和无依据数据；保留定义、因果推理、比较、条件和局限。遇到不确定或疑似错误的专业内容，跳过该点，不要编造或擅自补全。
-- 每篇英文正文用学术英语重写，首次出现的高难术语提供上下文线索。图表如有使用，需转成可在正文定位的文字描述。
-- 所有题干、选项、参考答案为英文；同时必须提供忠实的中文版本。不得将原始素材全文直接搬运到 passages 中。
+【核心分值与题型规定】
+为保证系统校验 100% 通过，12 道题的分值必须严格按照下表分配，不得变动：
 
-【强制双语字段】
-1. passages 每篇提供 title（英文）和 titleZh（中文），paragraphs 为英文段落数组，paragraphsZh 为逐段对应的中文翻译，数组长度和段落顺序必须严格一致。注意：双语「原文」指供考生阅读的学术化阅读文章及其中文译文，不是素材的整份原始转录。
-2. questions 每题必须有英文 prompt、中文 promptZh；客观题必须有标准答案字段 answer 与中文答案解释 answerZh；所有题都有 explanation:{en,zh}、evidence（例如 P1 ¶2）。
-3. 单选每个选项提供 text（英文）和 textZh（中文），唯一正确；TFNG 的 FALSE 必须与原文直接相反，NOT GIVEN 是原文无支持亦无反证；填空题提供 maxWords（字数上限）及 acceptedAnswers（可接受英文答案），答案不得超字数。
-4. 简答题必须额外提供 modelAnswer（英文参考答案）、modelAnswerZh（中文译文）、answerZh（中文要点）、suggestedWords:{min,max} 和 rubric 数组。rubric 的每项包含 id、criterion、description:{en,zh}、maxPoints、dimension (english 或 professional)。同义且科学上等价的回答可按条目评分。
-5. 逐题明示分值；100 分总分、40/60 维度、60/40 客观主观必须精确一致。所有 ID 唯一；题目 passageIds 要对应已定义文章。
+- Q01: single_choice | 考英语 | points: 6, englishPoints: 6, professionalPoints: 0
+- Q02: single_choice | 考英语 | points: 6, englishPoints: 6, professionalPoints: 0
+- Q03: single_choice | 考英语 | points: 6, englishPoints: 6, professionalPoints: 0
+- Q04: single_choice | 考英语 | points: 6, englishPoints: 6, professionalPoints: 0
+- Q05: tfng          | 考英语 | points: 6, englishPoints: 6, professionalPoints: 0
+- Q06: tfng          | 考英语 | points: 6, englishPoints: 6, professionalPoints: 0
+- Q07: gap_fill      | 考专业 | points: 7, englishPoints: 0, professionalPoints: 7
+- Q08: single_choice | 考专业 | points: 8, englishPoints: 0, professionalPoints: 8
+- Q09: tfng          | 考专业 | points: 9, englishPoints: 0, professionalPoints: 9
+- Q10: short_answer  | 跨考   | points: 13, englishPoints: 1, professionalPoints: 12
+  -> rubric 必须包含：1 项 english (1分) + 3 项 professional (各4分)
+- Q11: short_answer  | 跨考   | points: 13, englishPoints: 1, professionalPoints: 12
+  -> rubric 必须包含：1 项 english (1分) + 3 项 professional (各4分)
+- Q12: short_answer  | 跨考   | points: 14, englishPoints: 2, professionalPoints: 12
+  -> rubric 必须包含：1 项 english (2分) + 3 项 professional (各4分)
 
-【JSON schemaVersion=1.0 必须兼容的结构】
-{
- "schemaVersion":"1.0",
- "exam":{"id":"new-unique-id","title":"English exam title","subtitle":"...","discipline":"...","durationMinutes":30,"instructions":"Answer all questions in English.","scoring":{"totalPoints":100,"englishPoints":40,"professionalPoints":60,"objectivePoints":60,"shortAnswerPoints":40}},
- "passages":[{"id":"P1","title":"English heading","titleZh":"中文标题","topic":"...","paragraphs":["English paragraph 1", "English paragraph 2"],"paragraphsZh":["中文第1段","中文第2段"]}],
- "questions":[{"id":"Q01","passageIds":["P1"],"topic":"...","competency":"english","type":"single_choice","prompt":"Question in English?","promptZh":"中文题干？","points":7,"englishPoints":7,"professionalPoints":0,"options":[{"id":"A","text":"English option","textZh":"中文选项"},{"id":"B","text":"Other option","textZh":"其他选项"}],"answer":"A","answerZh":"中文正确答案说明","evidence":"P1 ¶1","explanation":{"en":"Reason in English","zh":"中文解析"}}]
+【文章与素材处理】
+1. 两篇学术化英文阅读（P1 和 P2），总词数严格控制在 800–1000 词。适合 30 分钟阅读。
+2. 剔除素材中的口语、重复、记忆口诀；遇到不确定或疑似错误的专业内容跳过，不要编造。
+3. 首次出现的生僻学术词汇在文中给出语境线索。
+
+【强制字段格式】
+1. passages：提供 id, title, titleZh, topic, paragraphs（英文段落数组）, paragraphsZh（中文段落数组，与英文严格逐段对应）。
+2. questions：
+   - 每题包含 id, passageIds, topic, competency, type, prompt, promptZh, points, englishPoints, professionalPoints, explanation:{en, zh}, evidence。
+   - single_choice: 提供 options 数组（含 id, text, textZh），唯一正确答案 answer 及 answerZh。
+   - tfng: answer 必须为 "TRUE"、"FALSE" 或 "NOT GIVEN" 之一，并提供 answerZh。
+   - gap_fill: 提供 maxWords（正整数）和 acceptedAnswers 数组，提供 answer 及 answerZh。
+   - short_answer: 必须包含 modelAnswer, modelAnswerZh, answerZh, suggestedWords:{min, max}, 以及 rubric 数组（含 id, criterion, description:{en, zh}, maxPoints, dimension）。rubric 各项分值和维度必须与上述硬性规定精确一致！
+
+【exam 头部评分字段固定值】
+"scoring": {
+  "totalPoints": 100,
+  "englishPoints": 40,
+  "professionalPoints": 60,
+  "objectivePoints": 60,
+  "shortAnswerPoints": 40
 }
-可选题型仅 single_choice、tfng、gap_fill、short_answer；tfng 使用 TRUE/FALSE/NOT GIVEN，gap_fill 使用 maxWords 和 acceptedAnswers；short_answer 使用 modelAnswer、modelAnswerZh、suggestedWords 和 rubric。上方 JSON 只是字段示范，不代表完整题量：实际输出必须包含两篇文章、12题及三道简答题，并完成所有校验。
 
-【请在此粘贴新的学科素材】
+【输出约束】
+仅输出符合 RFC 8259 的标准 JSON 字符串，不得带有任何 Markdown 代码块标记。
 `;}
 function renderHome(){currentScreen='home';const b=bank(),a=attempt(),objs=b.questions.filter(objective).length,shorts=b.questions.length-objs;app.innerHTML=header(`<span class="chip blue">本地离线</span>`)+`<main class="container"><section class="surface compact-home"><div class="sectionhead" style="margin:0"><div><h1>学术测试</h1><p class="muted small">选择题库、限时作答、查看解析，或导入其他学科的 JSON 题库。</p></div><span class="chip ${a?.submittedAt?'green':a?'amber':'blue'}">${esc(currentStatus())}</span></div><div class="compact-stats"><span><strong>${esc(b.exam.durationMinutes)} 分钟</strong></span><span>${b.questions.length} 题（${objs} 客观 + ${shorts} 简答）</span><span>${readingWords(b)} 英文词</span><span>英语 ${b.exam.scoring.englishPoints} / 学科 ${b.exam.scoring.professionalPoints} 分</span></div></section><div style="height:15px"></div><div class="grid2"><div class="stack"><section class="surface"><div class="sectionhead"><h2 class="card-title">当前考试</h2></div><h3>${esc(b.exam.title)}</h3><p class="small muted" style="margin:7px 0 12px">${esc(b.exam.subtitle||b.exam.discipline||'')}</p><div class="buttonrow"><button class="btn primary" id="start">${a&&!a.submittedAt?'继续作答':a?.submittedAt?'重新考试':`开始 ${b.exam.durationMinutes} 分钟考试`}</button>${a?.submittedAt?'<button class="btn" id="viewresult">查看成绩与双语解析</button>':''}</div>${a&&!a.submittedAt?`<p class="small muted" style="margin-top:10px">开始时间：${fmtDate(a.startedAt)}；离开页面不会暂停倒计时。</p>`:''}<div class="buttonrow" style="margin-top:13px"><button class="btn minor ghost" id="downloadbank">下载当前题库 JSON</button><button class="btn minor ghost" id="copybank">复制当前题库 JSON</button></div></section><section class="surface"><h2 class="card-title">题库管理</h2><div class="banklist" id="banklist"></div><div class="rule"></div><div class="filedrop" id="dropzone" role="button" tabindex="0" aria-label="选择 JSON 题库文件"><strong>点击选择或拖入 JSON 文件</strong><p class="small muted">支持其他学科；导入时检查题型、答案、分值和 Rubric。</p></div><input type="file" id="importfile" accept=".json,application/json" class="hide"></section></div><div class="stack"><section class="surface"><div class="sectionhead"><h2 class="card-title">生成新题库的提示词</h2><span class="chip">可复制</span></div><p class="small muted">将提示词复制给 LLM，再附上新素材。模板要求中文译文、双语答案和评分细则，不限制学科。</p><textarea class="promptbox" id="promptbox" readonly aria-label="供 LLM 生成题库的 JSON 提示词">${esc(promptForLLM())}</textarea><div class="buttonrow" style="margin-top:12px"><button class="btn dark" id="copyprompt">一键复制命题提示词</button><button class="btn minor" id="downloadprompt">下载提示词</button></div></section><section class="surface"><h2 class="card-title">使用说明</h2><p class="small muted">客观题交卷后自动判分；简答题可复制答卷与中英双语参考材料，由外部 LLM 按 Rubric 评分。成绩和作答进度保存在当前浏览器本地。</p><p class="note-compact">考试中已拦截 Ctrl/⌘+F、Ctrl/⌘+G 与 F3 页面查找快捷键；复制与粘贴保持可用。浏览器菜单发起的原生查找无法由网页完全禁止。本工具不属于服务器端防作弊系统。</p></section></div></div></main>`;
 const list=document.getElementById('banklist');[BUILTIN,...banks].forEach((bk,index)=>{const it=document.createElement('button');it.className='bankrow'+(bk.exam.id===selected?' selected':'');it.innerHTML=`<span class="round">${index+1}</span><span class="banktext"><strong>${esc(bk.exam.title)}</strong><small>${esc(bk.exam.discipline||bk.exam.subtitle||'')} · ${bk.questions.length} questions</small></span><span class="chip ${bk.exam.id===selected?'blue':''}">${bk.exam.id===BUILTIN.exam.id?'内置':'已导入'}</span>`;it.onclick=()=>setSelected(bk.exam.id);list.append(it)});
